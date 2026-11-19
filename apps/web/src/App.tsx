@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, CheckCheck, Cog, CircleHelp, Folder, LayoutDashboard, ListTodo, MessageSquare, Search, Send, Radio, ChevronRight, Plus } from "lucide-react";
+import { ArrowRight, BookOpen, CheckCheck, Cog, CircleHelp, Folder, LayoutDashboard, ListTodo, MessageSquare, Search, Send, Radio, ChevronRight, Plus } from "lucide-react";
 import { APP_LABELS, ROLE_LABELS, SESSION_ROLES, type AppKind, type Message, type Project, type Run, type RunItem, type Session, type Task, type WsEvent } from "@crewpip/shared";
 import { LanguageProvider, recipientLabel, useBoardLanguage } from "./language.tsx";
 import { displayError } from "./errors.ts";
@@ -7,6 +7,7 @@ import { api, ConnectionError, wsUrl } from "./api.ts";
 import { Tasks } from "./Tasks.tsx";
 import { Content } from "./Content.tsx";
 import { Connections } from "./Connections.tsx";
+import { Guide } from "./Guide.tsx";
 import { useTheme } from "./theme.ts";
 
 const NAME_KEY = "crewpip.humanName";
@@ -158,7 +159,7 @@ function Board() {
       <a className="brand" href="#" onClick={e => { e.preventDefault(); setView("overview"); setProjectId(null); }}><span className="brand-mark"><Cog size={19} /></span>CrewPip<span className="brand-dot">.</span></a>
       <div className="workspace-label">{ui.workspaceBrand}</div>
       <nav className="primary-nav" aria-label={ui.navigation}>
-        {([["overview", ui.overview, LayoutDashboard], ["tasks", ui.tasks, ListTodo], ["messages", ui.messages, MessageSquare]] as const).map(([id, label, Icon]) => <button key={id} className={view === id ? "active" : ""} aria-current={view === id ? "page" : undefined} onClick={() => setView(id)}><Icon size={18} />{label}{id === "tasks" && <span className="nav-count">{openTasks.length}</span>}</button>)}
+        {([["overview", ui.overview, LayoutDashboard], ["tasks", ui.tasks, ListTodo], ["messages", ui.messages, MessageSquare], ["guide", ui.guide.nav, BookOpen]] as const).map(([id, label, Icon]) => <button key={id} className={view === id ? "active" : ""} aria-current={view === id ? "page" : undefined} onClick={() => setView(id)}><Icon size={18} />{label}{id === "tasks" && <span className="nav-count">{openTasks.length}</span>}</button>)}
       </nav>
       <div className="section">{ui.projects} <span>{visibleProjects.length}</span></div>
       <label className="search-field sidebar-search"><Search size={15} /><input aria-label={ui.searchProjects} placeholder={ui.projectPlaceholder} value={projectSearch} onChange={e => setProjectSearch(e.target.value)} /></label>
@@ -199,11 +200,7 @@ function Board() {
         </>}
         {view === "tasks" && <><div className="page-heading"><div><p className="eyebrow">{ui.taskEyebrow}</p><h1>{ui.tasks}</h1><p>{ui.tasksIntro}</p></div></div><Tasks tasks={tasks} projects={projects} sessions={sessions} projectFilter={projectId} onError={setError} runs={runs} runApps={runApps} liveItems={liveItems} /></>}
         {view === "messages" && <><div className="page-heading"><div><p className="eyebrow">{ui.messageEyebrow}</p><h1>{ui.messages}</h1><p>{ui.messagesIntro}</p></div><button className="primary" onClick={() => write()}><Plus size={17} />{ui.compose}</button></div><div className="message-filters"><label className="search-field"><Search size={17} /><input value={search} onChange={e => setSearch(e.target.value)} aria-label={ui.searchMessages} placeholder={ui.messagePlaceholder} /></label><select aria-label={ui.filterMessages} value={messageScope} onChange={e => setMessageScope(e.target.value)}><option value="all">{ui.allMessages}</option><option value="director">{ui.toDirector}</option><option value="waiting">{ui.pendingDelivery}</option></select><span>{shown.length} {ui.messageCount}</span></div><div className="message-list">{shown.slice(0, 100).map(m => <MessageCard key={m.id} message={m} onReply={reply} />)}{shown.length > 100 && <p>{ui.latestHundred}</p>}{!shown.length && <div className="empty">{ui.noMessages}</div>}</div></>}
-        {view === "guide" && <><div className="page-heading"><div><p className="eyebrow">{ui.guideEyebrow}</p><h1>{ui.guideTitle}</h1><p>{ui.guideIntro}</p></div></div><SetupLinks /><div className="guide-grid">
-          <article><span className="step-number">1</span><h2>{ui.setGoalTitle}</h2><p>{ui.goalExample}</p><button className="primary" onClick={() => write("director")}>{ui.writeDirector} <ArrowRight size={16} /></button></article>
-          <article><span className="step-number">2</span><h2>{ui.recordWork}</h2><p>{ui.taskGuide}</p><button className="secondary" onClick={() => setView("tasks")}>{ui.planTask} <ArrowRight size={16} /></button></article>
-          <article><span className="step-number">3</span><h2>{ui.reviewResults}</h2><p>{ui.reviewGuide}</p><button className="secondary" onClick={() => setView("tasks")}>{ui.viewTasks} <ArrowRight size={16} /></button></article>
-        </div><section className="help-panel"><h2>{ui.behindScenes}</h2><p>{ui.localGuide}</p><p>{ui.deliveryGuide}</p><p>{ui.worktreeGuide}</p></section></>}
+        {view === "guide" && <><div className="page-heading"><div><p className="eyebrow">{ui.guide.eyebrow}</p><h1>{ui.guide.title}</h1><p>{ui.guide.intro}</p></div></div><SetupLinks /><Guide onWrite={write} onTasks={() => setView("tasks")} /></>}
         {selected && <details className="session-settings"><summary>{ui.manageChats(selected.name, projectSessions.length)}</summary><p>{ui.roleGuide}</p>{projectSessions.map(s => <div className="session-setting" key={s.id}><div><strong>{s.name}</strong><small>{APP_LABELS[s.app]} · {ui.connectionState[s.connection]} {ui.lastSeen} {date(s.lastSeenAt, locale)}</small></div><select aria-label={ui.roleFor(s.name)} value={s.role ?? ""} onChange={e => void editSession(s, { role: e.target.value || null })}><option value="">{ui.noRole}</option>{SESSION_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}</select><button className="secondary" onClick={() => { const name = prompt(ui.chatName, s.name); if (name?.trim()) void editSession(s, { name: name.trim() }); }}>{ui.rename}</button><button className="text-button" onClick={() => void forget(s)}>{ui.unregister}</button></div>)}</details>}
         </>}
       </div>

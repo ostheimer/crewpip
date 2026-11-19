@@ -103,6 +103,8 @@ Sternchen bzw. für das gemeinsame Projekt. Gibt es gar keine Session, legt der 
 
 ## Zustellwege
 
+Chats sind nie direkt miteinander verbunden: Jeder Chat ist an CrewPip angeschlossen, CrewPip ist der Briefkasten dazwischen. [So funktioniert CrewPip](docs/kommunikation.md) erklärt Aufbau, Zustellwege, Adressen, Zustände und Grenzen in einem Text.
+
 | Weg | Claude Code | Cursor | Codex |
 |---|---|---|---|
 | Hinterlassen | MCP-Tool `post_message` | MCP-Tool `post_message` | MCP-Tool `post_message` |
