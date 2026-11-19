@@ -306,6 +306,10 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
     }
   });
 
+  app.get("/api/flows", (req, res) => {
+    const hours = Math.min(Math.max(Number(req.query.hours ?? 24) || 24, 1), 168);
+    res.json(inbox.flows(new Date(Date.now() - hours * 3600000).toISOString()));
+  });
   app.get("/api/messages", (req, res) => {
     const limit = Math.min(Number(req.query.limit ?? 200), 1000);
     res.json(inbox.recent(limit));

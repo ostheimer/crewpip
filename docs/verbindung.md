@@ -1,13 +1,13 @@
 # Wann ein Chat als verbunden gilt
 
-Das Dashboard zeigt unter „Verbundene Chats“ je Repo jeden eingetragenen Chat mit einem von
+Das Dashboard zeigt unter „Chats an CrewPip“ je Repo jeden eingetragenen Chat mit einem von
 vier Zuständen. Die Regel steht in `connectionOf` (`apps/daemon/src/inbox.ts`) und ist in
 `apps/daemon/test/connection.test.ts` getestet. Das MCP-Werkzeug `list_sessions` nennt
 denselben Zustand als `verbindung=…`.
 
 | Zustand | Bedingung | Bedeutung |
 | --- | --- | --- |
-| Verbunden (`connected`) | nicht ausgetragen, der Hook hat sich mindestens einmal gemeldet, der Agent-Prozess läuft | Post kommt beim nächsten Turn an, auch wenn der Chat gerade ruht. |
+| Post kommt an (`connected`) | nicht ausgetragen, der Hook hat sich mindestens einmal gemeldet, der Agent-Prozess läuft | Post kommt beim nächsten Turn an, auch wenn der Chat gerade ruht. |
 | Ohne Hook (`no-hook`) | eingetragen, aber nie über den Hook gemeldet (nur Claude-Registry oder nur MCP-Aufruf) | CrewPip kennt den Chat, aber ob Post von selbst ankommt, ist offen. Meldet sich der Hook auch nach dem nächsten Turn nicht, Chat neu starten oder Einrichtung prüfen. |
 | Veraltet (`stale`) | der Agent-Prozess läuft nicht mehr, der Eintrag ist aber offen | Liegen gebliebener Eintrag. |
 | Beendet (`ended`) | ausgetragen (SessionEnd, Claude-Registry, Platzhalter abgelöst oder von Hand) | erscheint nicht in der Übersicht. |
