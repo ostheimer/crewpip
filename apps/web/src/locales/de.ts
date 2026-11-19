@@ -168,6 +168,10 @@ export const de = {
   image: "[Bild:",
   noDescription: "ohne Beschreibung",
   language: "Sprache",
+  theme: "Darstellung",
+  themeSystem: "System",
+  themeDark: "Dunkel",
+  themeLight: "Hell",
   succeeded: "erfolgreich",
   failed: "fehlgeschlagen",
 
