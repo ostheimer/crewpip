@@ -7,12 +7,12 @@ Token-Schutz sind implementiert. Für aktuelle Einrichtung und Grenzen gilt die 
 
 ## Kontext
 
-mngboard soll Chats in Claude Code, Cursor und Codex auf demselben Mac miteinander reden
+CrewPip soll Chats in Claude Code, Cursor und Codex auf demselben Mac miteinander reden
 lassen. Zwei Bauweisen standen zur Wahl:
 
-- **A, Sidecar:** Die Chats bleiben in ihren Apps. mngboard ist ein MCP-Server plus ein
+- **A, Sidecar:** Die Chats bleiben in ihren Apps. CrewPip ist ein MCP-Server plus ein
   Hook-Skript, das die Apps aufrufen.
-- **B, eigene Laufzeit:** mngboard startet und steuert die Sessions selbst (Claude Agent SDK,
+- **B, eigene Laufzeit:** CrewPip startet und steuert die Sessions selbst (Claude Agent SDK,
   Cursor CLI/ACP, Codex App-Server).
 
 Historischer Recherchestand vom 2026-09-01: Alle drei Apps unterstützen MCP über
@@ -44,7 +44,7 @@ Arbeitsverzeichnis zu, das jedes Tool als Pflichtfeld mitbringt.
 - Baut nur auf Mechanismen, die in allen drei Apps stabil dokumentiert sind. Claude Code
   Channels (Preview), `codex mcp-server` (abgekündigt) und der Codex App-Server („may change
   without notice“) bleiben außen vor.
-- Variante B lässt sich später für Agents ergänzen, die mngboard selbst startet.
+- Variante B lässt sich später für Agents ergänzen, die CrewPip selbst startet.
 
 Ergänzung 2026-09-02 (Namen): Der Daemon liest zusätzlich die Session-Registry von Claude
 Code (`~/.claude/sessions/<pid>.json`). Die Existenz dieser Dateien ist dokumentiert
@@ -54,16 +54,16 @@ Registry bleiben Hooks und MCP unverändert nutzbar. Der Gewinn rechtfertigt die
 weil nur so Namen aus `/rename`, Fenster ohne Hooks und beendete Sessions ohne Zutun
 stimmen.
 
-Ergänzung 2026-09-03 (Variante B): mngboard startet Agents jetzt auch selbst, ohne die
+Ergänzung 2026-09-03 (Variante B): CrewPip startet Agents jetzt auch selbst, ohne die
 Sidecar-Variante abzulösen. Beides steht nebeneinander: von der App gestartete Fenster
-bleiben über Hooks und MCP angebunden, von mngboard gestartete Läufe kommen dazu. Belegt am
+bleiben über Hooks und MCP angebunden, von CrewPip gestartete Läufe kommen dazu. Belegt am
 2026-09-03, dass Codex in sauberer Umgebung startet und Claude Code nicht, weil dessen
 Desktop-App die Anmeldung nur an eigene Kindprozesse durchreicht.
 
-Ergänzung 2026-09-18 (Befehle in schreibenden Läufen): Der Agent committet, mngboard pusht.
+Ergänzung 2026-09-18 (Befehle in schreibenden Läufen): Der Agent committet, CrewPip pusht.
 Befehlsmuster auf Shell-Zeilen lassen sich nicht zuverlässig gegen Refspec-Tricks absichern;
 belegt mit einem echten Lauf, der trotz Verbotsregel auf main schrieb. Die Grenze „nicht auf
-main" ist deshalb baulich gezogen: Nur mngboard ruft `git push` auf, mit fester Argumentliste
+main" ist deshalb baulich gezogen: Nur CrewPip ruft `git push` auf, mit fester Argumentliste
 für genau den Branch der Aufgabe.
 
 ## Folgen und Risiken

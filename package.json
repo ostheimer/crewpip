@@ -1,26 +1,31 @@
 {
-  "name": "mngboard",
+  "name": "crewpip",
   "private": true,
   "version": "0.1.0",
   "description": "Nachrichtenzentrale für KI-Coding-Agents auf dem Mac (Claude Code, Cursor, Codex)",
   "packageManager": "pnpm@10.29.2",
   "engines": {
-    "node": ">=22.5"
+    "node": "^22.18.0 || >=24"
   },
   "scripts": {
     "dev": "pnpm -r --parallel --filter ./apps/daemon --filter ./apps/web dev",
-    "daemon": "pnpm --filter @mngboard/daemon dev",
-    "web": "pnpm --filter @mngboard/web dev",
+    "daemon": "pnpm --filter @crewpip/daemon dev",
+    "web": "pnpm --filter @crewpip/web dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test",
-    "snippets": "pnpm --filter @mngboard/daemon snippets",
-    "service:install": "pnpm build && node scripts/service.mjs install",
+    "test": "node --test scripts/test/*.test.mjs && pnpm -r test",
+    "snippets": "pnpm --filter @crewpip/daemon snippets",
+    "service:install": "node scripts/service.mjs check-install && pnpm build && node scripts/service.mjs install",
     "service:uninstall": "node scripts/service.mjs uninstall",
-    "service:restart": "pnpm build && node scripts/service.mjs restart",
+    "service:restart": "node scripts/service.mjs check-install && pnpm build && node scripts/service.mjs restart",
     "service:status": "node scripts/service.mjs status",
-    "db:status": "pnpm --filter @mngboard/daemon db:status",
-    "db:migrate": "pnpm --filter @mngboard/daemon db:migrate",
-    "db:backup": "pnpm --filter @mngboard/daemon db:backup"
+    "db:status": "pnpm --filter @crewpip/daemon db:status",
+    "db:migrate": "pnpm --filter @crewpip/daemon db:migrate",
+    "db:backup": "pnpm --filter @crewpip/daemon db:backup",
+    "service:migrate": "node scripts/service.mjs migrate"
+  },
+  "dependencies": {
+    "jsonc-parser": "^3.3.1",
+    "smol-toml": "^1.9.1"
   }
 }

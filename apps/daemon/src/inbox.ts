@@ -13,12 +13,11 @@ import {
   type SessionRole,
   type Target,
   APP_LABELS,
-  ROLE_LABELS,
   roleFromName,
   formatTarget,
   parseTarget,
   sessionLabel,
-} from "@mngboard/shared";
+} from "@crewpip/shared";
 import type { RegistryEntry } from "./registry/claude.js";
 import type { Proc } from "./peer.js";
 import type { Board } from "./board.js";
@@ -140,7 +139,7 @@ export function targetLabel(t: Target, resolveSession?: (id: string) => string |
 }
 
 /**
- * Kern von mngboard: Sessions verwalten, Nachrichten ablegen, pro Session festhalten,
+ * Kern von CrewPip: Sessions verwalten, Nachrichten ablegen, pro Session festhalten,
  * was sie schon gesehen hat, und Wartende aufwecken.
  */
 export class Inbox extends EventEmitter<InboxEvents> {

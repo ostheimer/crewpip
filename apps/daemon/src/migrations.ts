@@ -188,7 +188,7 @@ export const MIGRATIONS: Migration[] = [
   },
   {
     id: "0008-lauf-push",
-    title: "Ergebnis des Pushs, den mngboard nach einem schreibenden Lauf ausführt",
+    title: "Ergebnis des Pushs, den CrewPip nach einem schreibenden Lauf ausführt",
     up: (db) => {
       db.exec("ALTER TABLE runs ADD COLUMN push_log TEXT");
     },

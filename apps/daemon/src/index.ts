@@ -20,14 +20,14 @@ const runner = new Runner(db, board, {
   logDir: path.join(path.dirname(config.dbPath), "runs"),
   log: (l) => console.log(l),
 });
-const authDisabled = process.env.MNGBOARD_AUTH === "off";
+const authDisabled = process.env.CREWPIP_AUTH === "off";
 const token = authDisabled ? "" : loadOrCreateToken();
 const daemon = createDaemon(inbox, board, runner, {
   webDist,
   schemaVersion: schemaVersion(db),
   token,
   authDisabled,
-  allowedHosts: (process.env.MNGBOARD_ALLOWED_HOSTS ?? "").split(",").map((h) => h.trim()).filter(Boolean),
+  allowedHosts: (process.env.CREWPIP_ALLOWED_HOSTS ?? "").split(",").map((h) => h.trim()).filter(Boolean),
 });
 
 // Übernimmt Namen (auch nach /rename), Inbox-Sockets und beendete Sessions aus der
@@ -36,12 +36,12 @@ const registry = new ClaudeRegistryWatcher(inbox.registrySync(), { log: (l) => c
 registry.start();
 
 daemon.server.listen(config.port, config.host, () => {
-  console.log(`mngboard-daemon läuft auf ${baseUrl()}  (DB: ${config.dbPath})`);
+  console.log(`crewpip-daemon läuft auf ${baseUrl()}  (DB: ${config.dbPath})`);
   console.log(`  MCP:   ${baseUrl()}/mcp/<app>`);
   console.log(`  Hooks: ${baseUrl()}/hooks/<app>/<event>`);
   console.log(`  Claude-Registry: ${registryDir()}`);
   console.log(`  Schema: ${schemaVersion(db)}`);
-  console.log(authDisabled ? "  Zugangsschutz: AUS (MNGBOARD_AUTH=off)" : `  Token: ${tokenPath()}`);
+  console.log(authDisabled ? "  Zugangsschutz: AUS (CREWPIP_AUTH=off)" : `  Token: ${tokenPath()}`);
 });
 
 for (const sig of ["SIGINT", "SIGTERM"] as const) {

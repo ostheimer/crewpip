@@ -114,7 +114,7 @@ export function defaultBase(root: string): string {
 
 export interface AddWorktreeOptions {
   root: string;
-  /** Zielverzeichnis, üblicherweise <root>/.mngboard/worktrees/<slug> */
+  /** Zielverzeichnis, üblicherweise <root>/.crewpip/worktrees/<slug> */
   dir: string;
   branch: string;
   /** Branch oder Commit, von dem abgezweigt wird */
@@ -186,7 +186,7 @@ export interface BootstrapResult {
 /**
  * Führt den Bootstrap-Befehl eines Projekts in einem frischen Worktree aus.
  *
- * Der Befehl kommt aus mngboards eigener Ablage, nicht aus dem Repository: sonst würde ein
+ * Der Befehl kommt aus CrewPips eigener Ablage, nicht aus dem Repository: sonst würde ein
  * Repository bestimmen, was der Daemon ausführt. Er läuft über die Shell, weil solche Befehle
  * üblicherweise Ketten sind (`pnpm install && pnpm --filter x build`).
  *
@@ -234,7 +234,7 @@ export function worktreeCommitPaths(worktreeDir: string, branch: string): string
   if (!m) return null;
   const adminDir = path.resolve(worktreeDir, m[1]!.trim());
   const commonDir = path.resolve(adminDir, "..", "..");
-  const branchDir = path.dirname(branch); // "mngboard" für "mngboard/10-titel"
+  const branchDir = path.dirname(branch); // "crewpip" für "crewpip/10-titel"
   return [
     path.join(commonDir, "objects"),
     path.join(commonDir, "refs", "heads", branchDir),
@@ -253,11 +253,11 @@ export interface PushResult {
  * des Projekts läuft dabei mit; ein roter Hook lässt den Push scheitern, und das ist gewollt.
  */
 export async function pushBranch(worktreeDir: string, branch: string, timeoutMs = 20 * 60 * 1000): Promise<PushResult> {
-  if (!/^mngboard\/[\w.-]+$/.test(branch)) {
-    return { ok: false, output: `Gepusht werden nur mngboard-Branches, nicht ${branch}` };
+  if (!/^crewpip\/[\w.-]+$/.test(branch)) {
+    return { ok: false, output: `Gepusht werden nur CrewPip-Branches, nicht ${branch}` };
   }
   // Trace2 records the actual hook subprocess, independent of its output and build cache.
-  const traceDir = fs.mkdtempSync(path.join(os.tmpdir(), "mngboard-push-trace-"));
+  const traceDir = fs.mkdtempSync(path.join(os.tmpdir(), "crewpip-push-trace-"));
   const tracePath = path.join(traceDir, "events.jsonl");
   let ok = false;
   let output = "";

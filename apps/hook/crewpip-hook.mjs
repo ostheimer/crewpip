@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 /**
- * mngboard-Hook für Claude Code, Cursor und Codex.
+ * CrewPip-Hook für Claude Code, Cursor und Codex.
  *
- *   node mngboard-hook.mjs <claude|cursor|codex> <session-start|prompt|stop|session-end>
+ *   node crewpip-hook.mjs <claude|cursor|codex> <session-start|prompt|stop|session-end>
  *
  * Liest das Hook-Payload der App von stdin, meldet es dem Daemon und übersetzt die
  * Antwort in das Ausgabeformat der jeweiligen App. Läuft der Daemon nicht oder geht
  * irgendetwas schief, endet das Skript still mit Exit 0, damit der Chat nie hängt.
  *
- * Umgebungsvariablen: MNGBOARD_URL (Standard http://127.0.0.1:7357),
- * MNGBOARD_SESSION_NAME (optionaler Anzeigename der Session), MNGBOARD_RUN (Nummer des Laufs,
- * wenn mngboard die Session gestartet hat), MNGBOARD_HOOK_TIMEOUT_MS (Standard 2500),
- * MNGBOARD_HOOK_DEBUG (Dateipfad: schreibt Eingabe, Anfrage und Antwort dorthin),
- * MNGBOARD_TOKEN oder MNGBOARD_TOKEN_FILE (Standard ~/.mngboard/token).
+ * Umgebungsvariablen: CREWPIP_URL (Standard http://127.0.0.1:7357),
+ * CREWPIP_SESSION_NAME (optionaler Anzeigename der Session), CREWPIP_RUN (Nummer des Laufs,
+ * wenn CrewPip die Session gestartet hat), CREWPIP_HOOK_TIMEOUT_MS (Standard 2500),
+ * CREWPIP_HOOK_DEBUG (Dateipfad: schreibt Eingabe, Anfrage und Antwort dorthin),
+ * CREWPIP_TOKEN oder CREWPIP_TOKEN_FILE (Standard ~/.crewpip/token).
  */
 import { appendFileSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -24,9 +24,9 @@ const EVENTS = new Set(["session-start", "prompt", "stop", "session-end"]);
 
 /** Das Token liegt neben der Datenbank und ist nur für den Eigentümer lesbar. */
 export function readToken(env = process.env) {
-  if (env.MNGBOARD_TOKEN) return env.MNGBOARD_TOKEN.trim();
+  if (env.CREWPIP_TOKEN) return env.CREWPIP_TOKEN.trim();
   try {
-    return readFileSync(env.MNGBOARD_TOKEN_FILE ?? join(homedir(), ".mngboard", "token"), "utf8").trim() || null;
+    return readFileSync(env.CREWPIP_TOKEN_FILE ?? join(homedir(), ".crewpip", "token"), "utf8").trim() || null;
   } catch {
     return null;
   }
@@ -56,8 +56,8 @@ export function renderMessages(messages) {
     (m) => `#${m.id} (${m.createdAt})\nvon: ${m.from.label}\nan: ${m.toLabel}\nantworten an: ${m.replyTo}\n\n${m.text}`,
   );
   return (
-    `[mngboard] ${messages.length === 1 ? "Neue Nachricht" : `${messages.length} neue Nachrichten`} ` +
-    `für deine Session. Antworten über das MCP-Tool mngboard post_message mit dem Ziel aus "antworten an".\n\n` +
+    `[CrewPip] ${messages.length === 1 ? "Neue Nachricht" : `${messages.length} neue Nachrichten`} ` +
+    `für deine Session. Antworten über das MCP-Tool crewpip post_message mit dem Ziel aus "antworten an".\n\n` +
     lines.join("\n\n---\n\n")
   );
 }
@@ -69,9 +69,9 @@ export function renderMessages(messages) {
  */
 export function renderSessionKey(key) {
   return (
-    `[mngboard] Sitzungsschlüssel: ${key}\n` +
+    `[CrewPip] Sitzungsschlüssel: ${key}\n` +
     "Im gleichen Verzeichnis arbeitet noch ein Chat derselben App. Gib diesen Schlüssel " +
-    "deshalb bei mngboard-Werkzeugen als session_key mit, sonst kann mngboard dich nicht " +
+    "deshalb bei CrewPip-Werkzeugen als session_key mit, sonst kann CrewPip dich nicht " +
     "von ihm unterscheiden und lehnt ab. Der Schlüssel gehört nur dir: nicht weitergeben " +
     "und keinen fremden verwenden."
   );
@@ -105,21 +105,21 @@ export function formatOutput(app, event, response) {
 }
 
 export async function callDaemon({ app, event, payload, env, fetchImpl = fetch }) {
-  const base = (env.MNGBOARD_URL ?? "http://127.0.0.1:7357").replace(/\/$/, "");
-  const timeout = Number(env.MNGBOARD_HOOK_TIMEOUT_MS ?? 2500);
+  const base = (env.CREWPIP_URL ?? "http://127.0.0.1:7357").replace(/\/$/, "");
+  const timeout = Number(env.CREWPIP_HOOK_TIMEOUT_MS ?? 2500);
   const body = {
     app,
     event,
     sessionId: sessionIdOf(app, payload),
     cwd: cwdOf(app, payload, env),
-    name: env.MNGBOARD_SESSION_NAME ?? null,
-    runId: env.MNGBOARD_RUN ? Number(env.MNGBOARD_RUN) : null,
+    name: env.CREWPIP_SESSION_NAME ?? null,
+    runId: env.CREWPIP_RUN ? Number(env.CREWPIP_RUN) : null,
     payload: { hook_event_name: payload.hook_event_name, stop_hook_active: payload.stop_hook_active, status: payload.status },
   };
   const token = readToken(env);
   const res = await fetchImpl(`${base}/hooks/${app}/${event}`, {
     method: "POST",
-    headers: { "content-type": "application/json", ...(token ? { "x-mngboard-token": token } : {}) },
+    headers: { "content-type": "application/json", ...(token ? { "x-crewpip-token": token } : {}) },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(timeout),
   });
@@ -128,7 +128,7 @@ export async function callDaemon({ app, event, payload, env, fetchImpl = fetch }
 }
 
 function debug(entry) {
-  const file = process.env.MNGBOARD_HOOK_DEBUG;
+  const file = process.env.CREWPIP_HOOK_DEBUG;
   if (!file) return;
   try {
     appendFileSync(file, JSON.stringify({ at: new Date().toISOString(), app, event, ...entry }) + "\n");

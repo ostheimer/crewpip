@@ -37,22 +37,22 @@ test("Ohne Token kommt niemand an Daten oder Aktionen", async () => {
 });
 
 test("Ein falsches Token wird abgewiesen, ein richtiges durchgelassen", async () => {
-  assert.equal((await fetch(`${base}/api/health`, { headers: { "x-mngboard-token": "falsch" } })).status, 401);
-  assert.equal((await fetch(`${base}/api/health`, { headers: { "x-mngboard-token": TOKEN } })).status, 200);
+  assert.equal((await fetch(`${base}/api/health`, { headers: { "x-crewpip-token": "falsch" } })).status, 401);
+  assert.equal((await fetch(`${base}/api/health`, { headers: { "x-crewpip-token": TOKEN } })).status, 200);
   assert.equal((await fetch(`${base}/api/health`, { headers: { authorization: `Bearer ${TOKEN}` } })).status, 200);
   // Ein Token gleicher Länge darf nicht durchrutschen.
-  assert.equal((await fetch(`${base}/api/health`, { headers: { "x-mngboard-token": "x".repeat(TOKEN.length) } })).status, 401);
+  assert.equal((await fetch(`${base}/api/health`, { headers: { "x-crewpip-token": "x".repeat(TOKEN.length) } })).status, 401);
 });
 
 test("Fremde Herkunft und fremder Host werden abgelehnt, auch mit gültigem Token", async () => {
-  const withOrigin = await fetch(`${base}/api/health`, { headers: { "x-mngboard-token": TOKEN, origin: "https://boese.example" } });
+  const withOrigin = await fetch(`${base}/api/health`, { headers: { "x-crewpip-token": TOKEN, origin: "https://boese.example" } });
   assert.equal(withOrigin.status, 403, "eine Webseite darf den Daemon nicht ansprechen");
 
   // Host-Kopf von Hand setzen: so sähe DNS-Rebinding aus.
   const sock = await new Promise<string>((resolve) => {
     const port = (daemon.server.address() as AddressInfo).port;
     const c = net.createConnection(port, "127.0.0.1", () => {
-      c.write(`GET /api/health HTTP/1.1\r\nHost: boese.example\r\nx-mngboard-token: ${TOKEN}\r\nConnection: close\r\n\r\n`);
+      c.write(`GET /api/health HTTP/1.1\r\nHost: boese.example\r\nx-crewpip-token: ${TOKEN}\r\nConnection: close\r\n\r\n`);
     });
     let buf = "";
     c.on("data", (d) => (buf += d.toString()));
@@ -72,7 +72,7 @@ test("Die Oberfläche bleibt erreichbar, die Startseite trägt das Token", async
   await new Promise<void>((r) => d2.server.listen(0, "127.0.0.1", r));
   const url = `http://127.0.0.1:${(d2.server.address() as AddressInfo).port}/`;
   const html = await (await fetch(url)).text();
-  assert.match(html, new RegExp(`window.__MNGBOARD_TOKEN__="${TOKEN}"`), "das Token steht in der Startseite");
+  assert.match(html, new RegExp(`window.__CREWPIP_TOKEN__="${TOKEN}"`), "das Token steht in der Startseite");
   const foreign = await fetch(url, { headers: { origin: "https://boese.example" } });
   assert.equal(foreign.status, 403, "eine fremde Seite bekommt die Startseite gar nicht");
   assert.ok(!(await foreign.text()).includes(TOKEN), "und damit auch nicht das Token");
@@ -103,14 +103,14 @@ test("Hilfsfunktionen: Hosts, Kopfzeilen, Tokendatei", () => {
   assert.equal(tokenFromRequest({ get: () => undefined } as never), null);
 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tok-"));
-  process.env.MNGBOARD_TOKEN_FILE = path.join(dir, "token");
-  delete process.env.MNGBOARD_TOKEN;
+  process.env.CREWPIP_TOKEN_FILE = path.join(dir, "token");
+  delete process.env.CREWPIP_TOKEN;
   try {
     const t = loadOrCreateToken();
     assert.ok(t.length >= 32, "das Token ist lang genug");
     assert.equal(loadOrCreateToken(), t, "ein zweiter Aufruf liefert dasselbe");
-    assert.equal(fs.statSync(process.env.MNGBOARD_TOKEN_FILE).mode & 0o777, 0o600, "nur der Eigentümer darf lesen");
+    assert.equal(fs.statSync(process.env.CREWPIP_TOKEN_FILE).mode & 0o777, 0o600, "nur der Eigentümer darf lesen");
   } finally {
-    delete process.env.MNGBOARD_TOKEN_FILE;
+    delete process.env.CREWPIP_TOKEN_FILE;
   }
 });

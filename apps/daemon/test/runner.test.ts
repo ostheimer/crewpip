@@ -9,10 +9,10 @@ import { Board } from "../src/board.js";
 import { Inbox } from "../src/inbox.js";
 import { Runner } from "../src/runner/index.js";
 import { RUNNER_APPS, codexApp, claudeApp } from "../src/runner/apps.js";
-import type { RunItem, RunStatus } from "@mngboard/shared";
+import type { RunItem, RunStatus } from "@crewpip/shared";
 
 function repo(): string {
-  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "mngboard-run-")));
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "crewpip-run-")));
   const run = (...a: string[]) => execFileSync("git", ["-C", dir, ...a], { stdio: "ignore" });
   run("init", "-q", "-b", "main");
   run("config", "user.email", "t@e.com");
@@ -25,7 +25,7 @@ function repo(): string {
 
 /** Ersetzt das echte Programm durch ein Skript, das Codex-förmige Zeilen ausgibt. */
 function stubApp(script: string): string {
-  const p = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "mngboard-stub-")), "stub.sh");
+  const p = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "crewpip-stub-")), "stub.sh");
   fs.writeFileSync(p, script, { mode: 0o755 });
   return p;
 }
@@ -33,7 +33,7 @@ function stubApp(script: string): string {
 function setup(binPath: string | null) {
   const db = openDb(":memory:");
   const board = new Board(db);
-  const logDir = fs.mkdtempSync(path.join(os.tmpdir(), "mngboard-logs-"));
+  const logDir = fs.mkdtempSync(path.join(os.tmpdir(), "crewpip-logs-"));
   const original = codexApp.bin;
   const originalAuth = codexApp.loggedIn;
   codexApp.bin = () => binPath;
@@ -58,7 +58,7 @@ test("Ein Lauf wird gestartet, die Ausgabe aufbereitet und der Abschluss verbuch
 echo '{"type":"item.completed","item":{"id":"1","type":"agent_message","text":"Ich sehe mir das an."}}'
 echo 'kein JSON, wird übersprungen'
 echo '{"type":"item.completed","item":{"id":"2","type":"command_execution","command":"npm test","status":"completed"}}'
-echo '{"type":"item.completed","item":{"id":"3","type":"mcp_tool_call","server":"mngboard","tool":"read_inbox","status":"completed"}}'
+echo '{"type":"item.completed","item":{"id":"3","type":"mcp_tool_call","server":"crewpip","tool":"read_inbox","status":"completed"}}'
 echo '{"type":"item.completed","item":{"id":"4","type":"agent_message","text":"Fertig, Tests sind grün."}}'
 exit 0`);
   const { board, runner, restore } = setup(stub);
@@ -76,7 +76,7 @@ exit 0`);
   assert.equal(done.exitCode, 0);
   assert.equal(done.summary, "Fertig, Tests sind grün.", "die letzte Antwort wird als Zusammenfassung gemerkt");
   assert.deepEqual(items.map((i) => i.kind), ["message", "command", "tool", "message"]);
-  assert.deepEqual(runner.items(run.id).map((i) => i.text), ["Ich sehe mir das an.", "npm test", "mngboard · read_inbox", "Fertig, Tests sind grün."]);
+  assert.deepEqual(runner.items(run.id).map((i) => i.text), ["Ich sehe mir das an.", "npm test", "crewpip · read_inbox", "Fertig, Tests sind grün."]);
   restore();
 });
 
@@ -329,7 +329,7 @@ test("Obergrenze je Stunde bremst eine Session, die Läufe am Fließband startet
   const p = board.resolveProject(root);
   inbox.upsertSession({ id: "vielstarter", app: "claude", cwd: root, name: "Director" });
 
-  process.env.MNGBOARD_RUNS_PER_HOUR = "3";
+  process.env.CREWPIP_RUNS_PER_HOUR = "3";
   try {
     for (let i = 0; i < 3; i++) runner.start({ projectId: p.id, prompt: `x${i}`, app: "codex", mode: "read-only", startedBySessionId: "vielstarter" });
     assert.throws(
@@ -339,21 +339,21 @@ test("Obergrenze je Stunde bremst eine Session, die Läufe am Fließband startet
     // Aus der Oberfläche gilt die Grenze nicht.
     assert.doesNotThrow(() => runner.start({ projectId: p.id, prompt: "von Hand", app: "codex", mode: "read-only" }));
   } finally {
-    delete process.env.MNGBOARD_RUNS_PER_HOUR;
+    delete process.env.CREWPIP_RUNS_PER_HOUR;
     runner.stopAll();
     codexApp.bin = original;
     codexApp.loggedIn = originalAuth;
   }
 });
 
-// ---- Option A: fester Grundstock, Push durch mngboard ---------------------------------
+// ---- Option A: fester Grundstock, Push durch CrewPip ---------------------------------
 
-import { WRITE_ALLOW, WRITE_DENY } from "../src/runner/apps.js";
+import { WRITE_DENY } from "../src/runner/apps.js";
 import * as gitMod from "../src/git.js";
 
 /** Repository mit lokalem Remote und Hook-Verzeichnis, wie in demo-project über core.hooksPath. */
 function repoWithRemote(prePush: "gruen" | "rot"): { root: string; remote: string } {
-  const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "mngboard-push-")));
+  const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "crewpip-push-")));
   const remote = path.join(base, "remote.git");
   const root = path.join(base, "haupt");
   execFileSync("git", ["init", "-q", "--bare", remote]);
@@ -420,7 +420,7 @@ test("Codex bekommt nur die Git-Pfade für den Commit frei, nicht config und hoo
   const paths = gitMod.worktreeCommitPaths(wt.path, wt.branch)!;
   const common = path.join(root, ".git");
   assert.deepEqual(paths.map((x) => path.relative(common, x)).sort(), [
-    "logs/refs/heads/mngboard", "objects", "refs/heads/mngboard", path.join("worktrees", path.basename(wt.path)),
+    "logs/refs/heads/crewpip", "objects", "refs/heads/crewpip", path.join("worktrees", path.basename(wt.path)),
   ].sort());
   assert.ok(!paths.some((x) => /[/\\](config|hooks)$/.test(x)));
 
@@ -431,7 +431,7 @@ test("Codex bekommt nur die Git-Pfade für den Commit frei, nicht config und hoo
   restore();
 });
 
-test("Nach einem erfolgreichen Lauf pusht mngboard genau den Branch, main bleibt unberührt", async () => {
+test("Nach einem erfolgreichen Lauf pusht CrewPip genau den Branch, main bleibt unberührt", async () => {
   const { root, remote } = repoWithRemote("gruen");
   const { board, runner, restore } = setup(committingAgent());
   const p = board.resolveProject(root);
@@ -442,7 +442,7 @@ test("Nach einem erfolgreichen Lauf pusht mngboard genau den Branch, main bleibt
   const run = runner.start({ taskId: t.id, prompt: "arbeite", app: "codex", mode: "worktree-write" });
   const done = await waitDone(runner, run.id);
   assert.equal(done.status, "done", done.summary ?? "");
-  assert.match(done.pushLog ?? "", /^gepusht: origin\/mngboard\//);
+  assert.match(done.pushLog ?? "", /^gepusht: origin\/crewpip\//);
   assert.match(done.pushLog ?? "", /pre-push-gruen/, "der pre-push-Hook lief beim Push mit");
 
   assert.match(done.pushLog ?? "", /pre-push: Start .+ \| Ende .+ \| Exit [01] \| Dauer [\d.]+ s/);
@@ -472,7 +472,7 @@ test("Ein roter pre-push-Hook macht den Lauf zum Fehlschlag, der Commit bleibt l
   restore();
 });
 
-test("Ohne Commit wird nichts gepusht, und fremde Branches pusht mngboard nie", async () => {
+test("Ohne Commit wird nichts gepusht, und fremde Branches pusht CrewPip nie", async () => {
   const { root } = repoWithRemote("gruen");
   const { board, runner, restore } = setup(stubApp('#!/bin/sh\necho \'{"type":"item.completed","item":{"type":"agent_message","text":"nichts zu tun"}}\'\nexit 0'));
   const p = board.resolveProject(root);
@@ -482,8 +482,8 @@ test("Ohne Commit wird nichts gepusht, und fremde Branches pusht mngboard nie", 
   assert.equal(done.status, "done");
   assert.match(done.pushLog ?? "", /nichts gepusht/);
 
-  assert.match((await gitMod.pushBranch(root, "main")).output, /nur mngboard-Branches/);
-  assert.match((await gitMod.pushBranch(root, "mngboard/x:main")).output, /nur mngboard-Branches/);
+  assert.match((await gitMod.pushBranch(root, "main")).output, /nur CrewPip-Branches/);
+  assert.match((await gitMod.pushBranch(root, "crewpip/x:main")).output, /nur CrewPip-Branches/);
   restore();
 });
 
@@ -502,8 +502,8 @@ test("Hook evidence distinguishes absent, interrupted and nested subprocesses", 
 test("A push without a pre-push hook does not claim that the hook ran", async () => {
   const { root } = repoWithRemote("gruen");
   fs.unlinkSync(path.join(root, ".husky", "pre-push"));
-  execFileSync("git", ["-C", root, "branch", "mngboard/no-hook"]);
-  const result = await gitMod.pushBranch(root, "mngboard/no-hook");
+  execFileSync("git", ["-C", root, "branch", "crewpip/no-hook"]);
+  const result = await gitMod.pushBranch(root, "crewpip/no-hook");
   assert.equal(result.ok, true, result.output);
   assert.match(result.output, /keine Ausführung/);
 });

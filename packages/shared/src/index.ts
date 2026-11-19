@@ -26,7 +26,7 @@ export const ROLE_LABELS: Record<SessionRole, string> = {
 
 /**
  * Rolle aus dem Sitzungsnamen ableiten, damit die eingespielte Namenskonvention
- * ("Director", "PM outbig", "Worker mngboard") ohne Zusatzaufwand weiter funktioniert.
+ * ("Director", "PM outbig", "Worker CrewPip") ohne Zusatzaufwand weiter funktioniert.
  */
 export function roleFromName(name: string): SessionRole | null {
   const n = name.trim();
@@ -37,7 +37,7 @@ export function roleFromName(name: string): SessionRole | null {
 }
 
 export const RUN_MODES = ["read-only", "worktree-write"] as const;
-/** Was ein von mngboard gestarteter Agent darf. Mehr als diese zwei Stufen gibt es bewusst nicht. */
+/** Was ein von CrewPip gestarteter Agent darf. Mehr als diese zwei Stufen gibt es bewusst nicht. */
 export type RunMode = (typeof RUN_MODES)[number];
 
 export const RUN_MODE_LABELS: Record<RunMode, string> = {
@@ -78,7 +78,7 @@ export interface Run {
   exitCode: number | null;
   /** Letzte Antwort des Agents */
   summary: string | null;
-  /** Ergebnis des Pushs durch mngboard nach einem schreibenden Lauf; null heißt: keiner. */
+  /** Ergebnis des Pushs durch CrewPip nach einem schreibenden Lauf; null heißt: keiner. */
   pushLog: string | null;
   startedAt: string;
   endedAt: string | null;
@@ -108,7 +108,7 @@ export interface Project {
    * Befehl, der nach dem Anlegen eines Worktrees darin ausgeführt wird, etwa
    * `pnpm install --frozen-lockfile`. Ein frischer Worktree hat kein node_modules; ohne das
    * läuft weder ein Test noch ein Git-Hook. Bewusst hier hinterlegt und nicht aus dem
-   * Repository gelesen, damit mngboard keinen Code ausführt, den das Repository mitbringt.
+   * Repository gelesen, damit CrewPip keinen Code ausführt, den das Repository mitbringt.
    */
   bootstrap: string | null;
 }
@@ -123,7 +123,7 @@ export interface Task {
   status: TaskStatus;
   /** Session, die den Task übernommen hat */
   assignee: { id: string; label: string } | null;
-  /** Von mngboard angelegter Worktree */
+  /** Von CrewPip angelegter Worktree */
   worktree: { path: string; branch: string; createdAt: string } | null;
   /** Ausgabe des Bootstrap-Befehls; null heißt: keiner hinterlegt oder noch nicht gelaufen. */
   bootstrapLog: string | null;
@@ -132,7 +132,7 @@ export interface Task {
   updatedAt: string;
 }
 
-/** Ein Chat-Fenster in einer App: das eigentliche Subjekt in mngboard. */
+/** Ein Chat-Fenster in einer App: das eigentliche Subjekt in CrewPip. */
 export interface Session {
   id: string;
   app: AppKind;
@@ -221,9 +221,9 @@ export interface HookRequest {
   event: HookEvent;
   sessionId: string | null;
   cwd: string | null;
-  /** Optionaler Session-Name aus MNGBOARD_SESSION_NAME */
+  /** Optionaler Session-Name aus CREWPIP_SESSION_NAME */
   name?: string | null;
-  /** Nummer des Laufs aus MNGBOARD_RUN, wenn mngboard diese Session gestartet hat */
+  /** Nummer des Laufs aus CREWPIP_RUN, wenn CrewPip diese Session gestartet hat */
   runId?: number | null;
   payload?: unknown;
 }
@@ -234,7 +234,7 @@ export interface HookResponse {
   /** Nur bei "stop": false, wenn die Schleifensperre greift */
   mayContinue: boolean;
   /**
-   * Sitzungsschlüssel dieses Chats, wenn mngboard ihn braucht, um den Chat von anderen
+   * Sitzungsschlüssel dieses Chats, wenn CrewPip ihn braucht, um den Chat von anderen
    * Chats derselben App im gleichen Verzeichnis zu unterscheiden. Der Hook schreibt ihn in
    * den Kontext genau dieses Chats; er geht über keinen anderen Weg hinaus.
    */
@@ -302,13 +302,13 @@ export function formatTarget(t: Target): string {
 /**
  * Projekt und Worktree aus dem Arbeitsverzeichnis ableiten, ohne git aufzurufen. Nur als
  * Rückfalllösung: maßgeblich ist die Repository-Wurzel aus `git rev-parse --git-common-dir`.
- * Claude Code legt Worktrees unter <projekt>/.claude/worktrees/<name> an, mngboard unter
- * <projekt>/.mngboard/worktrees/<name>.
+ * Claude Code legt Worktrees unter <projekt>/.claude/worktrees/<name> an, CrewPip unter
+ * <projekt>/.crewpip/worktrees/<name>.
  */
 export function projectOf(cwd: string): { project: string; worktree: string | null } {
   const parts = cwd.split("/").filter(Boolean);
   const i = parts.lastIndexOf("worktrees");
-  if (i > 1 && (parts[i - 1] === ".claude" || parts[i - 1] === ".mngboard") && i + 1 < parts.length) {
+  if (i > 1 && (parts[i - 1] === ".claude" || parts[i - 1] === ".crewpip") && i + 1 < parts.length) {
     return { project: parts[i - 2]!, worktree: parts.slice(i + 1).join("/") };
   }
   return { project: parts[parts.length - 1] ?? cwd, worktree: null };
@@ -321,7 +321,7 @@ export function projectOf(cwd: string): { project: string; worktree: string | nu
 export function projectRootOf(cwd: string): string {
   const parts = cwd.split("/");
   const i = parts.lastIndexOf("worktrees");
-  if (i > 1 && (parts[i - 1] === ".claude" || parts[i - 1] === ".mngboard")) {
+  if (i > 1 && (parts[i - 1] === ".claude" || parts[i - 1] === ".crewpip")) {
     return parts.slice(0, i - 1).join("/") || "/";
   }
   return cwd;

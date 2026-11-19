@@ -113,9 +113,9 @@ test("Schleifensperre pro Session, Reset, Umbenennen", () => {
 
 test("Rollen: aus dem Namen abgeleitet, je Projekt nur ein PM, insgesamt ein Director", () => {
   const inbox = fresh();
-  const d = inbox.upsertSession({ id: "d", app: "claude", cwd: "/p/mngboard", name: "Director" });
+  const d = inbox.upsertSession({ id: "d", app: "claude", cwd: "/p/crewpip", name: "Director" });
   assert.equal(d.role, "director", "die Namenskonvention setzt die Rolle");
-  assert.equal(inbox.upsertSession({ id: "w", app: "claude", cwd: "/p/mngboard", name: "Worker mngboard" }).role, "worker");
+  assert.equal(inbox.upsertSession({ id: "w", app: "claude", cwd: "/p/crewpip", name: "Worker CrewPip" }).role, "worker");
   assert.equal(inbox.upsertSession({ id: "x", app: "claude", cwd: "/p/outbig", name: "irgendwas" }).role, null);
 
   const pm1 = inbox.upsertSession({ id: "pm1", app: "claude", cwd: "/p/outbig", name: "PM outbig" });
@@ -147,13 +147,13 @@ test("Ziele pm:<projekt> und director folgen der Rolle, nicht der Sitzung", () =
 
   const dm = inbox.post({ sessionId: "abs" }, "director", "Stand gemeldet");
   assert.equal(dm.toLabel, "den Director");
-  const dir = inbox.upsertSession({ id: "dir", app: "claude", cwd: "/p/mngboard", name: "Director" });
+  const dir = inbox.upsertSession({ id: "dir", app: "claude", cwd: "/p/crewpip", name: "Director" });
   assert.deepEqual(inbox.pendingFor(dir.id).map((x) => x.id), [dm.id]);
   assert.deepEqual(inbox.pendingFor(pm.id).map((x) => x.id), [m.id], "der PM bekommt nicht, was an den Director ging");
 
   // Nach einem Neustart unter anderer Sitzung greift die Rolle weiter
   inbox.endSession("dir");
-  const dir2 = inbox.upsertSession({ id: "dir2", app: "claude", cwd: "/p/mngboard", name: "Director" });
+  const dir2 = inbox.upsertSession({ id: "dir2", app: "claude", cwd: "/p/crewpip", name: "Director" });
   const dm2 = inbox.post({ sessionId: "abs" }, "director", "zweite Meldung");
   // Die erste Meldung wurde nie abgeholt, deshalb bekommt sie der neue Director mit.
   assert.deepEqual(inbox.pendingFor(dir2.id).map((x) => x.id), [dm.id, dm2.id]);

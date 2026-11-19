@@ -32,4 +32,4 @@ Braucht:    fehlender Beitrag oder nichts
 - Produktions- und Schemaänderungen nach den Freigaberegeln des jeweiligen Projekts.
 - Fremde Transkripte nicht routinemäßig kopieren; gezielte Rückfragen bevorzugen.
 - Modelle und Aufwand anhand Aufgabe, aktuellem Angebot und eigenem Budget wählen.
-  mngboard verlangt kein bestimmtes Modell oder Abo.
+  CrewPip verlangt kein bestimmtes Modell oder Abo.

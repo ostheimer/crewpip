@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { APP_LABELS, type Message } from "@mngboard/shared";
+import { APP_LABELS, type Message } from "@crewpip/shared";
 import { de } from "./locales/de.ts";
 import { en } from "./locales/en.ts";
 

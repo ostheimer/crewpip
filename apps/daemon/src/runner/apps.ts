@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import type { AppKind, RunItem, RunMode } from "@mngboard/shared";
+import type { AppKind, RunItem, RunMode } from "@crewpip/shared";
 
 /**
  * Anbindung je Coding-Werkzeug. Jede App bringt mit, wo ihr Programm liegt, wie ein
@@ -12,7 +12,7 @@ export interface RunArgs {
   prompt: string;
   mode: RunMode;
   /**
-   * Nur bei worktree-write in einem mngboard-Worktree: die Stellen im gemeinsamen
+   * Nur bei worktree-write in einem CrewPip-Worktree: die Stellen im gemeinsamen
    * Git-Verzeichnis, die ein Commit schreiben muss. Sie liegen außerhalb des Worktrees.
    */
   gitWritable?: string[];
@@ -20,11 +20,11 @@ export interface RunArgs {
 
 /**
  * Grundstock an Befehlen für schreibende Läufe (Option A, entschieden am 18.09.2026).
- * Committen ja, pushen nein: den Push übernimmt mngboard selbst, siehe Runner.
+ * Committen ja, pushen nein: den Push übernimmt CrewPip selbst, siehe Runner.
  *
  * Warum der Agent nicht pushen darf: Befehlsmuster lassen sich umgehen. Belegt am 18.09.2026
- * mit einem echten Lauf: `git push origin mngboard/x:main` ging trotz Verbotsregel durch und
- * schrieb auf main. Mit fester Argumentliste aus mngboard ist das ausgeschlossen.
+ * mit einem echten Lauf: `git push origin crewpip/x:main` ging trotz Verbotsregel durch und
+ * schrieb auf main. Mit fester Argumentliste aus CrewPip ist das ausgeschlossen.
  */
 export const WRITE_ALLOW = [
   "Bash(git add *)",
@@ -153,14 +153,14 @@ export const codexApp: RunnerApp = {
     mode === "worktree-write" ? "workspace-write" : "read-only",
     // Die Sandbox lässt nur im Worktree schreiben, das Git-Verzeichnis liegt außerhalb. Frei
     // werden nur die Stellen, die ein Commit braucht — nicht config und nicht hooks, sonst
-    // könnte der Agent die Git-Hooks abschalten. Netzwerk bleibt aus; gepusht wird von mngboard.
+    // könnte der Agent die Git-Hooks abschalten. Netzwerk bleibt aus; gepusht wird von crewpip.
     // UNGEPRÜFT im Betrieb: am 18.09.2026 war das Codex-Kontingent erschöpft.
     ...(mode === "worktree-write" && gitWritable?.length
       ? ["-c", `sandbox_workspace_write.writable_roots=${JSON.stringify(gitWritable)}`]
       : []),
     // Hooks laufen nur, wenn sie in Codex einmal per /hooks freigegeben wurden. Die Freigabe
     // wird hier bewusst nicht umgangen; ohne sie fehlt dem Lauf nur die Postfach-Zustellung.
-    ...(process.env.MNGBOARD_CODEX_BYPASS_HOOK_TRUST === "1" ? ["--dangerously-bypass-hook-trust"] : []),
+    ...(process.env.CREWPIP_CODEX_BYPASS_HOOK_TRUST === "1" ? ["--dangerously-bypass-hook-trust"] : []),
     prompt,
   ],
   parse: (line) => {
@@ -203,7 +203,7 @@ export const claudeApp: RunnerApp = {
     // "plan" darf nichts ändern, "acceptEdits" darf im Arbeitsverzeichnis schreiben.
     mode === "worktree-write" ? "acceptEdits" : "plan",
     "--max-turns",
-    process.env.MNGBOARD_CLAUDE_MAX_TURNS ?? "40",
+    process.env.CREWPIP_CLAUDE_MAX_TURNS ?? "40",
     ...(mode === "worktree-write" ? ["--allowedTools", ...WRITE_ALLOW, "--disallowedTools", ...WRITE_DENY] : []),
     // Kein Auftrag hier: er kommt über stdin, siehe promptVia.
   ],
@@ -233,7 +233,7 @@ export const claudeApp: RunnerApp = {
   },
   authProblem: (t) => /not logged in|please run \/login|invalid api key/i.test(t),
   loginHint:
-    "Mit dem von mngboard gefundenen Claude-Programm `auth status` prüfen und bei Bedarf `auth login` ausführen. " +
+    "Mit dem von CrewPip gefundenen Claude-Programm `auth status` prüfen und bei Bedarf `auth login` ausführen. " +
     "Die Anmeldung der Desktop-App allein belegt keine CLI-Anmeldung; vor einem Lauf auch die Abrechnungsart prüfen.",
   loggedIn: (bin) => {
     const out = ask(bin, ["auth", "status"]);

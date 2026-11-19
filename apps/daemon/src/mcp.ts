@@ -15,7 +15,7 @@ import {
   type RunMode,
   type Task,
   type TaskStatus,
-} from "@mngboard/shared";
+} from "@crewpip/shared";
 
 function renderRun(r: Run): string {
   const parts = [
@@ -74,14 +74,14 @@ function renderSessions(all: Session[], self: Session | null): string {
   return lines.join("\n");
 }
 
-const cwdParam = z.string().min(1).describe("Dein aktuelles Arbeitsverzeichnis (absoluter Pfad). Hilft mngboard, deine Session zu erkennen.");
+const cwdParam = z.string().min(1).describe("Dein aktuelles Arbeitsverzeichnis (absoluter Pfad). Hilft CrewPip, deine Session zu erkennen.");
 const keyParam = z
   .string()
   .min(1)
   .optional()
   .describe(
-    "Dein Sitzungsschlüssel, falls mngboard dir einen genannt hat (Zeile „Sitzungsschlüssel: …“ " +
-      "in einer mngboard-Meldung). Nötig, wenn mehrere Chats derselben App im gleichen Verzeichnis " +
+    "Dein Sitzungsschlüssel, falls CrewPip dir einen genannt hat (Zeile „Sitzungsschlüssel: …“ " +
+      "in einer CrewPip-Meldung). Nötig, wenn mehrere Chats derselben App im gleichen Verzeichnis " +
       "arbeiten. Nie raten und nie einen fremden Schlüssel verwenden.",
   );
 
@@ -103,7 +103,7 @@ function guarded<A extends unknown[]>(fn: (...a: A) => Promise<ToolResult>): (..
 }
 
 /**
- * Ein MCP-Server pro Aufruf, gebunden an eine App. Die aufrufende Session erkennt mngboard am
+ * Ein MCP-Server pro Aufruf, gebunden an eine App. Die aufrufende Session erkennt CrewPip am
  * Sitzungsschlüssel, den der Hook genau diesem Chat gegeben hat; ohne Schlüssel am Prozess, der
  * die Verbindung hält (caller); erst dann am Arbeitsverzeichnis, das jedes Tool mitbringt.
  */
@@ -114,14 +114,14 @@ export function createMcpServer(
   app: AppKind,
   caller: () => Promise<Proc | null> = async () => null,
 ): McpServer {
-  const server = new McpServer({ name: "mngboard", version: "0.3.0" });
+  const server = new McpServer({ name: "crewpip", version: "0.3.0" });
   let callerOnce: Promise<Proc | null> | null = null;
   const who = async (cwd: string, key?: string) => {
     const id = inbox.identify(app, cwd, await (callerOnce ??= caller().catch(() => null)), key);
     if (id.problem === "unbekannter-schluessel") {
       throw new UncertainIdentity(
         "Der mitgeschickte Sitzungsschlüssel gehört zu keiner laufenden Session dieser App. " +
-          "Dieser Aufruf ist abgelehnt. Nimm den Schlüssel wörtlich aus der jüngsten mngboard-Meldung " +
+          "Dieser Aufruf ist abgelehnt. Nimm den Schlüssel wörtlich aus der jüngsten CrewPip-Meldung " +
           "deines eigenen Chats, oder lass ihn weg — raten hilft nicht.",
       );
     }
@@ -132,9 +132,9 @@ export function createMcpServer(
     if (id.certain && id.session) return id.session;
     const names = [id.session, ...id.others].filter((s) => s !== null).map((s) => s!.label).join(", ");
     throw new UncertainIdentity(
-      `mngboard kann nicht sicher erkennen, welche Session du bist: ${names} arbeiten im selben Verzeichnis, ` +
+      `CrewPip kann nicht sicher erkennen, welche Session du bist: ${names} arbeiten im selben Verzeichnis, ` +
         "und dein Prozess ist keiner davon eindeutig zugeordnet. Damit nichts unter falschem Namen läuft, " +
-        "ist dieser Aufruf abgelehnt. Nenne deinen Sitzungsschlüssel im Feld session_key, wenn mngboard dir " +
+        "ist dieser Aufruf abgelehnt. Nenne deinen Sitzungsschlüssel im Feld session_key, wenn CrewPip dir " +
         "einen genannt hat; sonst sag dem Menschen Bescheid. Eine andere Session vorzuschieben hilft nicht.",
     );
   };
@@ -201,7 +201,7 @@ export function createMcpServer(
       const id = await who(cwd, session_key);
       const note = id.certain
         ? ""
-        : "\n\nAchtung: mngboard kann deine Session nicht eindeutig erkennen, deshalb ist keine mit * markiert. " +
+        : "\n\nAchtung: CrewPip kann deine Session nicht eindeutig erkennen, deshalb ist keine mit * markiert. " +
           "Mehrere Chats dieser App arbeiten im selben Verzeichnis; nenne deinen Sitzungsschlüssel in session_key.";
       return { content: [{ type: "text", text: renderSessions(inbox.sessions(), id.certain ? id.session : null) + note }] };
     }),
@@ -323,7 +323,7 @@ export function createMcpServer(
       description:
         "Startet ein Coding-Werkzeug als eigenen Prozess und meldet sich bei dir, sobald es fertig ist. " +
         'Standard ist "read-only": lesen und antworten, nichts ändern. "worktree-write" darf Dateien ändern und ' +
-        "verlangt deshalb eine Aufgabe mit Worktree. Ein Lauf, den mngboard gestartet hat, kann selbst keine Läufe starten.",
+        "verlangt deshalb eine Aufgabe mit Worktree. Ein Lauf, den CrewPip gestartet hat, kann selbst keine Läufe starten.",
       inputSchema: { cwd: cwdParam, session_key: keyParam,
         prompt: z.string().min(1).describe("Auftrag an den Agent, so vollständig wie möglich"),
         task_id: z.number().int().positive().optional().describe("Aufgabe, zu der der Lauf gehört; bestimmt auch das Arbeitsverzeichnis"),

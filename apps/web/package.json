@@ -1,5 +1,5 @@
 {
-  "name": "@mngboard/web",
+  "name": "@crewpip/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
-    "@mngboard/shared": "workspace:*",
+    "@crewpip/shared": "workspace:*",
     "lucide-react": "^1.53.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

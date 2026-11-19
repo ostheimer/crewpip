@@ -6,11 +6,18 @@ settings:
 
 importers:
 
-  .: {}
+  .:
+    dependencies:
+      jsonc-parser:
+        specifier: ^3.3.1
+        version: 3.3.1
+      smol-toml:
+        specifier: ^1.9.1
+        version: 1.9.1
 
   apps/daemon:
     dependencies:
-      '@mngboard/shared':
+      '@crewpip/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@modelcontextprotocol/sdk':
@@ -49,7 +56,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@mngboard/shared':
+      '@crewpip/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       lucide-react:
@@ -927,6 +934,9 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
+  jsonc-parser@3.3.1:
+    resolution: {integrity: sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==}
+
   longest-streak@3.1.0:
     resolution: {integrity: sha512-9Ri+o0JYgehTaVBBDoMqIl8GXtbWg711O3srftcHhZ0dqnETqLaoIK0x17fUw9rFSlK/0NlsKe0Ahhyl5pXE2g==}
 
@@ -1269,6 +1279,10 @@ packages:
   side-channel@1.1.1:
     resolution: {integrity: sha512-6x6dK6zJdpTzF4sQeNYxwtvBzf6Eg4GtlesS94HOvTudUeyK2WXAaIfmDgsyslYrRBeFIlsi54AYsFGUuhmvrQ==}
     engines: {node: '>= 0.4'}
+
+  smol-toml@1.9.1:
+    resolution: {integrity: sha512-j7WyPdf0CJoutMzMoPLF/bVXHtKZIT9Rb4eGeEbWw8X2t5oirjPgpL+OpaENZrILYaXqYwnVH+qgUwVbl+pUJQ==}
+    engines: {node: '>= 18'}
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -2212,6 +2226,8 @@ snapshots:
 
   json5@2.2.3: {}
 
+  jsonc-parser@3.3.1: {}
+
   longest-streak@3.1.0: {}
 
   lru-cache@5.1.1:
@@ -2834,6 +2850,8 @@ snapshots:
       side-channel-list: 1.0.1
       side-channel-map: 1.0.1
       side-channel-weakmap: 1.0.2
+
+  smol-toml@1.9.1: {}
 
   source-map-js@1.2.1: {}
 

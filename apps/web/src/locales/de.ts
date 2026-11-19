@@ -1,4 +1,4 @@
-import { TASK_STATUS_LABELS, RUN_MODE_LABELS, RUN_STATUS_LABELS, DELIVERY_LABELS } from "@mngboard/shared";
+import { TASK_STATUS_LABELS, RUN_MODE_LABELS, RUN_STATUS_LABELS, DELIVERY_LABELS } from "@crewpip/shared";
 
 export const de = {
   person: "Person",

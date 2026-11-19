@@ -10,16 +10,16 @@ Diese drei Regeln gelten für KI-erstellte oder wesentlich KI-bearbeitete Änder
 **Doku-Ausnahme:** Reine, nicht ausführbare Dokumentations- oder Kommentaränderungen ohne Einfluss auf Verhalten, Build, Konfiguration, Schema oder Abhängigkeiten benötigen keinen künstlich fehlschlagenden Test. Stattdessen zutreffende Text-, Link-, Beispiel- und Konsistenzprüfungen dokumentieren. Ausführbare Codebeispiele, generierte Konfiguration oder als Programmeingabe genutzte Dokumente sind nicht automatisch ausgenommen. Gemischte PRs prüfen den verhaltensändernden Teil regulär. Die Ausnahme im PR ausdrücklich begründen.
 <!-- END: agent-pr-quality-v1 -->
 
-## mngboard benutzen (für Agenten)
+## CrewPip benutzen (für Agenten)
 
-mngboard ist der Briefkasten zwischen den Chats auf diesem Rechner, auch zwischen Claude Code
+CrewPip ist der Briefkasten zwischen den Chats auf diesem Rechner, auch zwischen Claude Code
 und Codex. Technik und Einrichtung stehen in `README.md`, die Rollen in `docs/rollen.md`. Hier
 nur, was ein Agent im Alltag wissen muss.
 
 - **Zuerst die eigene Identität prüfen.** `list_sessions` markiert den eigenen Chat mit `*`.
   Fehlt das Sternchen oder lehnt ein Werkzeug mit „kann nicht sicher erkennen, welche Session
   du bist“ ab, dann nicht raten: keinen anderen Chat vorschieben, nicht an `all` senden, nicht
-  als Mensch über die HTTP-Schnittstelle schreiben. Nennt mngboard in einer Meldung einen
+  als Mensch über die HTTP-Schnittstelle schreiben. Nennt CrewPip in einer Meldung einen
   Sitzungsschlüssel, ihn als `session_key` mitgeben. Nie den Schlüssel eines anderen Chats
   verwenden und ihn nirgends zitieren.
 - **An Adressen schreiben, nicht an Namen.** Zum Antworten den Wert aus „antworten an“ nehmen.

@@ -1,10 +1,10 @@
 {
-  "name": "@mngboard/daemon",
+  "name": "@crewpip/daemon",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "bin": {
-    "mngboard-daemon": "./dist/index.js"
+    "crewpip-daemon": "./dist/index.js"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -16,10 +16,10 @@
     "db:status": "tsx src/db-cli.ts status",
     "db:migrate": "tsx src/db-cli.ts migrate",
     "db:backup": "tsx src/db-cli.ts backup",
-    "test:board": "pnpm --filter @mngboard/web build && tsx --test test/browser/board-language.ts"
+    "test:board": "pnpm --filter @crewpip/web build && tsx --test test/browser/board-language.ts"
   },
   "dependencies": {
-    "@mngboard/shared": "workspace:*",
+    "@crewpip/shared": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.20.0",
     "express": "^5.1.0",
     "ws": "^8.18.0",

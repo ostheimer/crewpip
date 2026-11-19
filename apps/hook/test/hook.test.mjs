@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { formatOutput, callDaemon, sessionIdOf, renderMessages } from "../mngboard-hook.mjs";
+import { formatOutput, callDaemon, sessionIdOf, renderMessages } from "../crewpip-hook.mjs";
 
-const script = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../mngboard-hook.mjs");
+const script = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../crewpip-hook.mjs");
 const msgs = [{ id: 7, from: { kind: "session", label: "Codex · example-project / Thread 14:02" }, toLabel: "Claude · example-project / api-worker", replyTo: "session:x1", text: "hi", createdAt: "2026-09-01T10:00:00Z" }];
 
 test("renderMessages nennt Absender, Empfänger und Antwortadresse", () => {
@@ -33,24 +33,24 @@ test("sessionIdOf: Cursor nutzt conversation_id", () => {
 test("callDaemon schickt Kontext und Token, aber keine Socket-Daten mehr", async () => {
   let seen;
   const fetchImpl = async (url, init) => { seen = { url, body: JSON.parse(init.body) }; return { ok: true, json: async () => ({ session: null, messages: [], mayContinue: true }) }; };
-  await callDaemon({ app: "claude", event: "stop", payload: { session_id: "s1", cwd: "/p" }, env: { MNGBOARD_SESSION_NAME: "planer", CLAUDE_CODE_MESSAGING_SOCKET: "/tmp/x.sock", CLAUDE_CODE_MESSAGING_TOKEN: "t" }, fetchImpl });
+  await callDaemon({ app: "claude", event: "stop", payload: { session_id: "s1", cwd: "/p" }, env: { CREWPIP_SESSION_NAME: "planer", CLAUDE_CODE_MESSAGING_SOCKET: "/tmp/x.sock", CLAUDE_CODE_MESSAGING_TOKEN: "t" }, fetchImpl });
   assert.equal(seen.url, "http://127.0.0.1:7357/hooks/claude/stop");
   assert.equal(seen.body.name, "planer");
   assert.equal(seen.body.cwd, "/p");
-  // Der Push-Weg ist entfallen; mngboard bekommt keine Socket-Daten mehr zu sehen.
+  // Der Push-Weg ist entfallen; CrewPip bekommt keine Socket-Daten mehr zu sehen.
   assert.equal("socketPath" in seen.body, false);
   assert.equal("socketToken" in seen.body, false);
 });
 
 test("Skript endet still mit Exit 0, wenn der Daemon nicht erreichbar ist", () => {
-  const r = spawnSync("node", [script, "claude", "stop"], { input: JSON.stringify({ session_id: "s" }), env: { ...process.env, MNGBOARD_URL: "http://127.0.0.1:1", MNGBOARD_HOOK_TIMEOUT_MS: "500" }, encoding: "utf8" });
+  const r = spawnSync("node", [script, "claude", "stop"], { input: JSON.stringify({ session_id: "s" }), env: { ...process.env, CREWPIP_URL: "http://127.0.0.1:1", CREWPIP_HOOK_TIMEOUT_MS: "500" }, encoding: "utf8" });
   assert.equal(r.status, 0);
   assert.equal(r.stdout, "");
 });
 
 test("Skript endet still bei falschen Argumenten oder kaputtem stdin", () => {
   assert.equal(spawnSync("node", [script, "foo", "bar"], { input: "{", encoding: "utf8" }).status, 0);
-  const r = spawnSync("node", [script, "claude", "stop"], { input: "not json", env: { ...process.env, MNGBOARD_URL: "http://127.0.0.1:1", MNGBOARD_HOOK_TIMEOUT_MS: "500" }, encoding: "utf8" });
+  const r = spawnSync("node", [script, "claude", "stop"], { input: "not json", env: { ...process.env, CREWPIP_URL: "http://127.0.0.1:1", CREWPIP_HOOK_TIMEOUT_MS: "500" }, encoding: "utf8" });
   assert.equal(r.status, 0);
   assert.equal(r.stdout, "");
 });

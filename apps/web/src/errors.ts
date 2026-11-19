@@ -25,10 +25,10 @@ const english: Record<string, string> = {
   "Kein Feld bootstrap angegeben": "The bootstrap field is missing.",
   "Unerwarteter Host": "Unexpected host.",
   "Unerlaubte Herkunft": "This origin is not allowed.",
-  "Token fehlt oder stimmt nicht. Es steht in ~/.mngboard/token.": "The token is missing or incorrect. Check ~/.mngboard/token.",
+  "Token fehlt oder stimmt nicht. Es steht in ~/.crewpip/token.": "The token is missing or incorrect. Check ~/.crewpip/token.",
   "Schreibende Läufe brauchen einen Worktree. Lege für den Task einen an, oder erlaube den Haupt-Checkout ausdrücklich.": "Write-enabled runs need a worktree. Create one for the task or explicitly allow the main checkout.",
   "In einem Terminal `codex login` ausführen; die ChatGPT-App teilt ihre Anmeldung mit dem CLI.": "Run `codex login` in a terminal. The ChatGPT app shares its sign-in with the CLI.",
-  "Mit dem von mngboard gefundenen Claude-Programm `auth status` prüfen und bei Bedarf `auth login` ausführen. Die Anmeldung der Desktop-App allein belegt keine CLI-Anmeldung; vor einem Lauf auch die Abrechnungsart prüfen.": "Use the Claude executable detected by CrewPip to run `auth status`, then `auth login` if needed. Check CLI sign-in and billing before starting a run.",
+  "Mit dem von CrewPip gefundenen Claude-Programm `auth status` prüfen und bei Bedarf `auth login` ausführen. Die Anmeldung der Desktop-App allein belegt keine CLI-Anmeldung; vor einem Lauf auch die Abrechnungsart prüfen.": "Use the Claude executable detected by CrewPip to run `auth status`, then `auth login` if needed. Check CLI sign-in and billing before starting a run.",
 };
 
 const patterns: [RegExp, string][] = [

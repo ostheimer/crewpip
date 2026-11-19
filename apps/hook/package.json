@@ -1,10 +1,10 @@
 {
-  "name": "@mngboard/hook",
+  "name": "@crewpip/hook",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Hook-Skript ohne Abhängigkeiten für Claude Code, Cursor und Codex",
-  "bin": { "mngboard-hook": "./mngboard-hook.mjs" },
+  "bin": { "crewpip-hook": "./crewpip-hook.mjs" },
   "scripts": {
     "typecheck": "echo hook is plain JS",
     "build": "echo hook has no build step",

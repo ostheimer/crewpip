@@ -14,7 +14,7 @@ function newInbox(): Inbox {
 }
 
 function tmpDir(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "mngboard-reg-"));
+  return fs.mkdtempSync(path.join(os.tmpdir(), "crewpip-reg-"));
 }
 function writeEntry(dir: string, pid: number, e: Record<string, unknown>): void {
   fs.writeFileSync(path.join(dir, `${pid}.json`), JSON.stringify({ pid, ...e }));
@@ -22,7 +22,7 @@ function writeEntry(dir: string, pid: number, e: Record<string, unknown>): void 
 
 test("readClaudeRegistry liest lebende Einträge und lässt tote sowie kaputte aus", () => {
   const dir = tmpDir();
-  writeEntry(dir, process.pid, { sessionId: "live", cwd: "/p/mngboard", name: "mngboard-55", nameSource: "derived", startedAt: 1788354767832 });
+  writeEntry(dir, process.pid, { sessionId: "live", cwd: "/p/crewpip", name: "crewpip-55", nameSource: "derived", startedAt: 1788354767832 });
   writeEntry(dir, 999999, { sessionId: "tot", cwd: "/p/x", name: "x-1" });
   fs.writeFileSync(path.join(dir, "kaputt.json"), "{halb geschrieben");
   fs.writeFileSync(path.join(dir, "egal.key"), "geheim");
@@ -34,8 +34,8 @@ test("readClaudeRegistry liest lebende Einträge und lässt tote sowie kaputte a
   assert.deepEqual(got[0], {
     pid: process.pid,
     sessionId: "live",
-    cwd: "/p/mngboard",
-    name: "mngboard-55",
+    cwd: "/p/crewpip",
+    name: "crewpip-55",
     nameSource: "derived",
     startedAt: new Date(1788354767832).toISOString(),
   });
@@ -70,14 +70,14 @@ test("Watcher übernimmt Sessions samt Socket und trägt verschwundene aus", () 
   const logs: string[] = [];
   const watcher = new ClaudeRegistryWatcher(inbox.registrySync(), { dir, intervalMs: 10_000, log: (l) => logs.push(l) });
 
-  writeEntry(dir, process.pid, { sessionId: "s-live", cwd: "/p/mngboard", name: "mngboard-55", nameSource: "derived", startedAt: Date.now() });
+  writeEntry(dir, process.pid, { sessionId: "s-live", cwd: "/p/crewpip", name: "crewpip-55", nameSource: "derived", startedAt: Date.now() });
   watcher.sweep();
 
   const s = inbox.sessions()[0]!;
-  assert.equal(s.label, "Claude · mngboard / mngboard-55");
+  assert.equal(s.label, "Claude · crewpip / crewpip-55");
 
   // Zugestellt wird über die Hooks; bis dahin wartet die Nachricht sichtbar.
-  const m = inbox.post({ human: "Mensch" }, "project:mngboard", "hallo");
+  const m = inbox.post({ human: "Mensch" }, "project:crewpip", "hallo");
   assert.deepEqual(inbox.pendingFor("s-live").map((x) => x.id), [m.id]);
 
   fs.rmSync(path.join(dir, `${process.pid}.json`));

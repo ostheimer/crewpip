@@ -18,12 +18,12 @@ import type { Request, Response, NextFunction } from "express";
  */
 
 export function tokenPath(): string {
-  return process.env.MNGBOARD_TOKEN_FILE ?? path.join(os.homedir(), ".mngboard", "token");
+  return process.env.CREWPIP_TOKEN_FILE ?? path.join(os.homedir(), ".crewpip", "token");
 }
 
 /** Liest das Token oder legt es beim ersten Start an. Datei nur für den Eigentümer lesbar. */
 export function loadOrCreateToken(): string {
-  const fromEnv = process.env.MNGBOARD_TOKEN?.trim();
+  const fromEnv = process.env.CREWPIP_TOKEN?.trim();
   if (fromEnv) return fromEnv;
   const file = tokenPath();
   try {
@@ -40,7 +40,7 @@ export function loadOrCreateToken(): string {
 }
 
 export function readToken(): string | null {
-  const fromEnv = process.env.MNGBOARD_TOKEN?.trim();
+  const fromEnv = process.env.CREWPIP_TOKEN?.trim();
   if (fromEnv) return fromEnv;
   try {
     return fs.readFileSync(tokenPath(), "utf8").trim() || null;
@@ -57,7 +57,7 @@ function sameToken(a: string, b: string): boolean {
 }
 
 export function tokenFromRequest(req: Request): string | null {
-  const header = req.get("x-mngboard-token");
+  const header = req.get("x-crewpip-token");
   if (header) return header.trim();
   const auth = req.get("authorization");
   if (auth?.toLowerCase().startsWith("bearer ")) return auth.slice(7).trim();
@@ -91,7 +91,7 @@ export function createAuth(opts: AuthOptions) {
       res.status(421).json({ error: "Unerwarteter Host" });
       return;
     }
-    // Eine fremde Herkunft heißt: die Anfrage kommt aus einer Webseite, nicht aus mngboard.
+    // Eine fremde Herkunft heißt: die Anfrage kommt aus einer Webseite, nicht aus crewpip.
     const origin = req.get("origin");
     if (origin && !hostAllowed(new URL(origin).host, allowedHosts)) {
       opts.log?.(`[auth] Herkunft abgelehnt: ${origin}`);
@@ -104,7 +104,7 @@ export function createAuth(opts: AuthOptions) {
     }
     const given = tokenFromRequest(req);
     if (!given || !sameToken(given, opts.token)) {
-      res.status(401).json({ error: "Token fehlt oder stimmt nicht. Es steht in ~/.mngboard/token." });
+      res.status(401).json({ error: "Token fehlt oder stimmt nicht. Es steht in ~/.crewpip/token." });
       return;
     }
     next();

@@ -2,11 +2,13 @@
 
 ## [Unreleased]
 
+- Umbenennung von mngboard in CrewPip. `pnpm service:migrate` sichert und übernimmt bestehende Installationen unter der neuen Dienstkennung.
+
 ### Neutraler Weitergabe-Stand
 
 - Persönliche Standardabsender durch „Mensch“ ersetzt; selbst gespeicherte Namen bleiben erhalten.
 - Kundenbezüge in Tests und Beispielen durch fiktive Namen ersetzt. Historische Prüfberichte
-  ohne persönliche Chat-IDs und Projektpfade zusammengefasst. Ostheimer bleibt als Urheber erhalten.
+  ohne persönliche Chat-IDs und Projektpfade zusammengefasst.
 - Alte Git-Versionen sind von dieser Inhaltsbereinigung nicht erfasst. Für eine Veröffentlichung
   ist ein separater Stand ohne private Historie vorgesehen.
 
@@ -20,7 +22,7 @@
   auf einem weiteren Rechner (nur macOS, eigenes Board je Rechner, kein Abgleich) und der
   Hinweis, dass ruhende Chats nicht geweckt werden.
 - **AGENTS.md: Anleitung für Agenten.** Bisher standen dort nur die PR-Regeln. Jetzt steht kurz,
-  wie man sich über mngboard abstimmt: Identität prüfen und bei Unklarheit nicht raten, an
+  wie man sich über CrewPip abstimmt: Identität prüfen und bei Unklarheit nicht raten, an
   Adressen statt Namen schreiben, „gesendet“ von „gelesen“ unterscheiden, eine Nachricht nicht
   als Freigabe behandeln, keine Schleifen, am Dienst nur mit Auftrag arbeiten.
 - **Prüfprotokoll des Aufwecktests vom 11.11.2026 abgelegt** (`docs/wecktest-2026-11-11.md`,
@@ -75,13 +77,13 @@
   Abgewogen: Die Tests hätten sich auch dadurch reparieren lassen, dass sie die Programmdatei
   vorab stellen — das hätte aber die eine Prüfung verdeckt, die hier wirklich falsch stand, und
   der nächste Rechner ohne Codex im PATH wäre erneut über die Reihenfolge gestolpert. Der Preis
-  der neuen Reihenfolge: Laufen schon vier Agents **und** fehlt das Programm, meldet mngboard
+  der neuen Reihenfolge: Laufen schon vier Agents **und** fehlt das Programm, meldet CrewPip
   jetzt zuerst die vier Agents. Beides sind Umstände der Umgebung, keine Angaben des Aufrufers;
   die Rangfolge unter ihnen ist beliebig. Nebeneffekt zugunsten des Aufrufers: Der Anmeldestatus
   wird erst abgefragt, wenn der Auftrag stimmt — ein fehlerhafter Aufruf startet dafür keinen
   Prozess mehr.
 
-- **Codex konnte über mngboard nicht mehr schreiben, sobald zwei seiner Chats im selben Ordner
+- **Codex konnte über CrewPip nicht mehr schreiben, sobald zwei seiner Chats im selben Ordner
   liefen (Aufgabe #46).** `post_message` und `read_inbox` aus dem demo-project-PM-Thread wurden von der
   Identitätssperre aus #13 abgelehnt. Gemeldet vom Codex-PM demo-project.
 
@@ -94,7 +96,7 @@
   grundsätzlich nicht trennen, und der Rückfall auf das Verzeichnis ist mehrdeutig.
 
   Behoben mit einem **Sitzungsschlüssel je Chat** (Migration `0010-sitzungsschluessel`):
-  mngboard erzeugt ihn und nennt ihn ausschließlich über den Hook dieses Chats; alle Tools
+  CrewPip erzeugt ihn und nennt ihn ausschließlich über den Hook dieses Chats; alle Tools
   haben dafür das optionale Feld `session_key`, das Prozess und Verzeichnis schlägt. Der
   Hinweis erscheint nur, solange ein anderer lebender Chat derselben App denselben Prozess und
   dasselbe Verzeichnis hat — allein im Ordner bleibt der Kontext unverändert. Ein unbekannter
@@ -113,7 +115,7 @@
   Chat läuft. „Der Chat, der gerade einen Turn hat“ wäre geraten und bricht, sobald zwei Chats
   im selben Ordner gleichzeitig arbeiten; genau das war der gemeldete Fall. Der Preis: Der
   Schlüssel steht im Kontext des Chats, ein Chat kann ihn also preisgeben. Er erlaubt nur, als
-  diese Session zu sprechen und deren Post zu lesen — weniger, als das mngboard-Token kann, das
+  diese Session zu sprechen und deren Post zu lesen — weniger, als das CrewPip-Token kann, das
   in der Codex-Konfiguration ohnehin steht. Zweiter Preis: Wird ein zweiter Chat mitten im Turn
   eines älteren geöffnet, wird der ältere für diesen Turn abgelehnt; den Schlüssel bekommt er
   mit dem nächsten Turn.
@@ -123,7 +125,7 @@
   unveränderten Stand fällt er („Hook liefert einen Sitzungsschlüssel“), mit dem Fix ist er
   grün. Befehl: `npx tsx --test --test-name-pattern="Aufgabe #46" test/http.test.ts` in
   `apps/daemon`, Gegenprobe mit `git stash push -- apps/daemon/src packages/shared/src
-  apps/hook/mngboard-hook.mjs`. Dazu geprüft: fremder Schlüssel, Schlüssel einer anderen App,
+  apps/hook/crewpip-hook.mjs`. Dazu geprüft: fremder Schlüssel, Schlüssel einer anderen App,
   Schlüssel einer beendeten Session — alle drei werden abgelehnt. Im Feld war die Lage vor dem
   Fix ebenfalls rot (PM- und Marketing-Thread ohne Sternchen, `read_inbox` abgelehnt).
 
@@ -157,7 +159,7 @@
 
 - **MCP-Aufrufe liefen unter fremdem Namen, sobald zwei Sessions im selben Ordner arbeiteten
   (Aufgabe #13).** Der Daemon wählte beim MCP-Aufruf die zuletzt aktive Session des
-  Verzeichnisses. Director und Worker im mngboard-Repo schrieben dadurch abwechselnd unter dem
+  Verzeichnisses. Director und Worker im CrewPip-Repo schrieben dadurch abwechselnd unter dem
   Namen des anderen, und der Fehler pflanzte sich fort: Die Nachricht des Directors an
   PM smartguardai trug die Antwortadresse des Workers, die Antwort des PM landete beim Worker.
   Auch Aufgaben bekamen den falschen „angelegt von“. Gemeldet vom Director.
@@ -180,7 +182,7 @@
   Belegt: echter `lsof`-Test gegen einen Kindprozess; Abnahme mit Attrappe (vier Nachrichten
   abwechselnd, jeweils nachdem die andere Session zuletzt aktiv war; Gegenprobe ohne
   Prozesserkennung scheitert); live: `list_sessions` mit dem Verzeichnis von demo-project erkannte den
-  Worker mngboard, und der Hook des Directors trug die Kette `claude 51628 → disclaimer →
+  Worker CrewPip, und der Hook des Directors trug die Kette `claude 51628 → disclaimer →
   Claude` ein, deren erstes Glied die Registry-pid ist. Für Codex ist der Weg über die
   Prozesskette gebaut, aber noch nicht im Betrieb geprüft.
 
@@ -204,11 +206,11 @@
 
 - **Push galt als zugestellt, ohne das Modell zu erreichen.** Der Inbox-Socket von Claude Code
   nimmt eine Nachricht nur mit dem aktuellen Token der Session an. Das Token gehört zum
-  Prozess, die Session-Kennung überlebt einen Neustart — mngboard erneuerte über die Registry
+  Prozess, die Session-Kennung überlebt einen Neustart — CrewPip erneuerte über die Registry
   Socket-Pfad und Prozessnummer, das Token aber nicht, weil es dort nicht steht. Danach schrieb
   der Daemon mit einem veralteten Token auf einen frischen Socket, verbuchte das als
   `push` und die Nachricht war weg.
-  Belegt an der Director-Session: mngboard führte sie seit 04.09. 11:41, der Prozess lief seit
+  Belegt an der Director-Session: CrewPip führte sie seit 04.09. 11:41, der Prozess lief seit
   05.09. 08:00. Gegenprobe am eigenen Socket: mit richtigem Token kam die Nachricht an, mit
   falschem und ganz ohne nicht.
   Behoben: Ein wechselnder Socket-Pfad verwirft das Token, und ohne Token wird nicht gepusht —
@@ -222,7 +224,7 @@
   Verbindung antwortete nie. Aufgefallen an einem Testlauf, der nach zwei Minuten abbrach
   statt zu scheitern.
 
-- **Absender „Du" für Nachrichten, die nicht von dir kamen.** Meldungen von mngboard selbst
+- **Absender „Du" für Nachrichten, die nicht von dir kamen.** Meldungen von CrewPip selbst
   trugen dasselbe Kennzeichen wie deine eigenen; jetzt steht dort „System", solange der Name
   nicht deiner ist.
 
@@ -251,7 +253,7 @@
   erschienen. Zustellung läuft jetzt ausschließlich über die Hooks; das Protokoll zeigt
   „wartet" statt „sofort". Ältere `push`-Einträge bleiben lesbar und heißen jetzt
   „über den Socket (unbestätigt)".
-  Nebeneffekt, der die Änderung zusätzlich rechtfertigt: mngboard speichert damit keine
+  Nebeneffekt, der die Änderung zusätzlich rechtfertigt: CrewPip speichert damit keine
   Messaging-Token fremder Sitzungen mehr. Das Hook-Skript schickt sie nicht mehr mit, Umzug
   `0006-socket-spalten-entfernen` löscht die beiden Spalten. Netto 179 Zeilen weniger Code.
 
@@ -265,7 +267,7 @@
   Hook gemeldeten Session zu. `list_agents` heißt jetzt `list_sessions`.
 - Web-UI: Sidebar nach Projekt gruppiert, Status pro Session (arbeitet, idle seit,
   beendet), Push-Kennzeichen, Umbenennen, Empfängerwahl nach Session, Projekt oder App.
-- Hook-Skript: `MNGBOARD_AGENT` entfällt, `MNGBOARD_SESSION_NAME` setzt den Anzeigenamen.
+- Hook-Skript: `CREWPIP_AGENT` entfällt, `CREWPIP_SESSION_NAME` setzt den Anzeigenamen.
   Die installierten Hook- und MCP-URLs bleiben gültig.
 - Datenbankschema neu; ohne Migration, die alte Datei wird gelöscht (enthielt nur Testdaten).
 
@@ -278,18 +280,18 @@
   für `pnpm run/exec/dlx`.
   **Abweichung vom Wortlaut der Entscheidung, begründet:** Die Entscheidung nannte `git push` in
   der Freigabe und versprach zugleich „nicht auf main". Beides zusammen ist mit Befehlsmustern
-  nicht zu halten — ein echter Lauf hat `git push origin mngboard/x:main` trotz Verbotsregel
-  durchgebracht und auf main geschrieben. Deshalb pusht jetzt mngboard selbst, nach einem
+  nicht zu halten — ein echter Lauf hat `git push origin crewpip/x:main` trotz Verbotsregel
+  durchgebracht und auf main geschrieben. Deshalb pusht jetzt CrewPip selbst, nach einem
   erfolgreichen Lauf, genau den Branch der Aufgabe, mit fester Argumentliste. Das Ziel der
   Entscheidung ist damit erreicht, der Weg ist ein anderer.
-- **Push durch mngboard nach dem Lauf**, mit pre-push-Hook des Projekts. Ein roter Hook macht den
+- **Push durch CrewPip nach dem Lauf**, mit pre-push-Hook des Projekts. Ein roter Hook macht den
   Lauf zum Fehlschlag, die Arbeit bleibt als Commit erhalten; das Ergebnis steht am Lauf
   (`push_log`, Umzug `0008-lauf-push`). Ohne Commit wird nichts gepusht.
 - **Codex:** Die Sandbox bekommt genau die vier Stellen im Git-Verzeichnis frei, die ein Commit
   im Worktree schreibt (gemessen), nicht `config` und `hooks`. Im Betrieb ungeprüft, weil das
   Codex-Kontingent am 18.09. erschöpft war.
 - Belegt mit einem echten Claude-Code-Lauf durch den Daemon, in einem Wegwerf-Repository mit
-  lokalem Remote: Commit erlaubt, `git push origin HEAD:main` abgelehnt, Branch von mngboard
+  lokalem Remote: Commit erlaubt, `git push origin HEAD:main` abgelehnt, Branch von CrewPip
   gepusht, pre-push-Hook lief, `main` unverändert.
 
 - **Bootstrap je Projekt.** Ein frisch angelegter Worktree hat kein `node_modules`; damit
@@ -297,12 +299,12 @@
   (etwa `pnpm install --frozen-lockfile`), das nach `git worktree add` im Worktree ausgeführt
   wird; Ausgabe und Ergebnis stehen am Task und in der Oberfläche. Ein Fehlschlag lässt den
   Worktree stehen und nennt den Grund, statt erst beim ersten Commit aufzuschlagen.
-  Der Befehl wird **in mngboard gepflegt, nicht aus dem Repository gelesen** — sonst würde
-  ein Repository bestimmen, was der Daemon ausführt. Belegt an mngboard selbst: Worktree
+  Der Befehl wird **in CrewPip gepflegt, nicht aus dem Repository gelesen** — sonst würde
+  ein Repository bestimmen, was der Daemon ausführt. Belegt an CrewPip selbst: Worktree
   angelegt, `pnpm install` gelaufen, Typecheck darin grün.
 
-- **Zugangsschutz für den Daemon.** Token in `~/.mngboard/token` (Modus 0600, beim ersten
-  Start erzeugt), verlangt als Kopfzeile `x-mngboard-token` oder `Authorization: Bearer` für
+- **Zugangsschutz für den Daemon.** Token in `~/.crewpip/token` (Modus 0600, beim ersten
+  Start erzeugt), verlangt als Kopfzeile `x-crewpip-token` oder `Authorization: Bearer` für
   `/api`, `/mcp`, `/hooks` und den WebSocket. Dazu Prüfung des Host-Kopfs gegen DNS-Rebinding
   und Abweisung fremder Herkünfte, beides auch bei gültigem Token. Die Weboberfläche bekommt
   das Token beim Ausliefern der Startseite eingesetzt; eine fremde Herkunft bekommt die Seite
@@ -317,9 +319,9 @@
   schreibend geht weiterhin nur im Worktree einer Aufgabe, den Haupt-Checkout erreicht dieser
   Weg gar nicht.
   - **Tiefenbegrenzung:** Eine Session, die aus einem Lauf stammt, darf keine Läufe starten.
-    Dazu merkt sich mngboard über die Umgebungsvariable `MNGBOARD_RUN` und den Hook, aus
+    Dazu merkt sich CrewPip über die Umgebungsvariable `CREWPIP_RUN` und den Hook, aus
     welchem Lauf eine Session hervorgegangen ist.
-  - **Obergrenze je Stunde** (`MNGBOARD_RUNS_PER_HOUR`, Standard 20) je anstoßender Session.
+  - **Obergrenze je Stunde** (`CREWPIP_RUNS_PER_HOUR`, Standard 20) je anstoßender Session.
   - **Herkunft** wird gespeichert und angezeigt; abbrechen darf nur, wer gestartet hat.
   - Ist ein Lauf fertig, bekommt die anstoßende Session eine Nachricht mit dem Ergebnis.
     Berichtet wird von der Session des Laufs selbst, falls sie sich angemeldet hat.
@@ -339,7 +341,7 @@
 
 - **Datenbank-Umzüge.** Nummerierte Kette in `migrations.ts`, festgehalten in
   `schema_migrations`. Vor dem ersten offenen Umzug wird mit `VACUUM INTO` nach
-  `~/.mngboard/backups/` gesichert (WAL-sicher, letzte zehn bleiben liegen); scheitert die
+  `~/.crewpip/backups/` gesichert (WAL-sicher, letzte zehn bleiben liegen); scheitert die
   Sicherung, wird nicht umgezogen. Jeder Umzug läuft in einer eigenen Transaktion und wird
   erst nach Erfolg eingetragen, ein Abbruch lässt den Stand unverändert. `pnpm db:status`,
   `pnpm db:migrate` und `pnpm db:backup` arbeiten auch ohne laufenden Daemon;
@@ -354,14 +356,14 @@
   `?refresh=1` verwirft den Puffer). Ein nicht angemeldetes Werkzeug lässt sich in der
   Oberfläche nicht auswählen, und der Daemon lehnt den Start mit dem passenden Hinweis ab.
 
-- **Variante B: Agents aus mngboard starten.** Ein Runner startet Codex oder Claude Code als
+- **Variante B: Agents aus CrewPip starten.** Ein Runner startet Codex oder Claude Code als
   eigenen Prozess in einer Aufgabe, liest die Ausgabe zeilenweise mit, zeigt Nachrichten,
   Befehle und Werkzeugaufrufe live und verbucht das Ergebnis. Ein fertiger Lauf setzt seine
   Aufgabe auf „zu prüfen".
   - Genau zwei Rechtestufen, „nur lesen" und „im Worktree schreiben"; eine Stufe ohne Sandbox
     gibt es bewusst nicht. Schreibende Läufe verlangen einen Worktree, ein Lauf kann das
     Projektverzeichnis nicht verlassen, höchstens vier gleichzeitig, Zeitlimit 30 Minuten,
-    jederzeit abbrechbar, vollständiges Protokoll unter `~/.mngboard/runs/`.
+    jederzeit abbrechbar, vollständiges Protokoll unter `~/.crewpip/runs/`.
   - **Kein MCP-Werkzeug startet Läufe**: Agents können keine Agents starten.
   - Codex läuft sofort. Claude Code nicht: Die Desktop-App reicht ihre Anmeldung nur an
     selbst gestartete Sitzungen durch, weder über die Umgebung noch über den Schlüsselbund.
@@ -375,7 +377,7 @@
   - Aufgaben mit fünf Zuständen und geprüften Übergängen, Zuweisung an eine Session,
     Notizen. Eine Zuweisung aus der Oberfläche erzeugt eine Nachricht an die Session, läuft
     also über denselben Zustellweg wie alles andere.
-  - Worktrees unter `<projekt>/.mngboard/worktrees/<id>-<titel>` mit eigenem Branch.
+  - Worktrees unter `<projekt>/.crewpip/worktrees/<id>-<titel>` mit eigenem Branch.
     Entfernen ist gesperrt, solange nicht committete Änderungen oder eigene Commits
     vorliegen; ein Branch ohne eigene Commits wird mitgelöscht, einer mit Commits bleibt.
   - Vier neue MCP-Werkzeuge: `list_tasks`, `create_task`, `claim_task`, `update_task`.
@@ -390,19 +392,19 @@
   feuern und melden die Session mit Projekt und Namen an. Gefunden dabei: Codex führt Hooks
   erst nach einer Freigabe per `/hooks` aus (Vertrauen hängt an der Prüfsumme der Datei),
   und `SessionEnd` erlaubt höchstens 3 s Timeout — der erzeugte Schnipsel setzt jetzt 3.
-- **`MNGBOARD_HOOK_DEBUG=<datei>`** schreibt Eingabe, Anfrage und Antwort jedes Hook-Aufrufs
+- **`CREWPIP_HOOK_DEBUG=<datei>`** schreibt Eingabe, Anfrage und Antwort jedes Hook-Aufrufs
   als JSON-Zeilen mit. Damit war überhaupt erst nachweisbar, dass Codex die Hooks nicht
-  ausführte, statt dass mngboard sie falsch beantwortete.
+  ausführte, statt dass CrewPip sie falsch beantwortete.
 - Ein per Hook angemeldetes Chat-Fenster löst den MCP-Platzhalter („ohne Hook") desselben
   Arbeitsverzeichnisses ab, statt doppelt in der Liste zu stehen.
 
 - **Session-Registry von Claude Code wird gelesen** (`~/.claude/sessions/*.json`, Pfad über
-  `MNGBOARD_CLAUDE_SESSIONS`). Der Daemon übernimmt Name, Arbeitsverzeichnis, Inbox-Socket
+  `CREWPIP_CLAUDE_SESSIONS`). Der Daemon übernimmt Name, Arbeitsverzeichnis, Inbox-Socket
   und Prozess-ID; ein Beobachter (fs.watch plus Abgleich alle 20 s) trägt geschlossene
   Fenster aus. Damit erscheinen Claude-Code-Sessions auch ohne eingerichtete Hooks, ein
-  `/rename` schlägt bis in mngboard durch, und veraltete Einträge verschwinden von selbst.
+  `/rename` schlägt bis in CrewPip durch, und veraltete Einträge verschwinden von selbst.
   Das Dateiformat ist von Version 2.1.255 abgelesen, nicht dokumentiert; fällt es weg,
-  arbeitet mngboard nur mit den Hooks weiter.
+  arbeitet CrewPip nur mit den Hooks weiter.
 - **Namensvorrang** `user` > `registry` > `auto`: ein ausdrücklich gesetzter Name (UI oder
   `/rename`) wird nie von einem abgeleiteten überschrieben.
 - **Worktrees werden ihrem Repository zugeordnet.** Ein Fenster in
@@ -416,21 +418,21 @@
   Agent-Name (`post_message`, `read_inbox`, `wait_for_message`, `list_agents`),
   Hook-Endpunkten für Sitzungsstart, Prompt, Turn-Ende und Sitzungsende, SQLite-Ablage
   über `node:sqlite`, WebSocket-Ereignisse und Auslieferung der Web-UI.
-- **Hook-Skript** `apps/hook/mngboard-hook.mjs` ohne Abhängigkeiten. Ein Skript für Claude
+- **Hook-Skript** `apps/hook/crewpip-hook.mjs` ohne Abhängigkeiten. Ein Skript für Claude
   Code, Cursor und Codex; übersetzt die Daemon-Antwort in `hookSpecificOutput`
   (Claude Code, Codex) bzw. `followup_message` / `additional_context` (Cursor). Endet bei
   jedem Fehler still mit Exit 0.
 - **Push in laufende Claude-Code-Sessions** über den Inbox-Socket, den der
   SessionStart-Hook meldet. Nachricht kommt zwischen zwei Tool-Aufrufen an oder startet
   einen neuen Turn.
-- **Schleifensperre** für Stop-Hook-Fortsetzungen (`MNGBOARD_MAX_STOP_CONTINUATIONS`,
+- **Schleifensperre** für Stop-Hook-Fortsetzungen (`CREWPIP_MAX_STOP_CONTINUATIONS`,
   Standard 10), zurückgesetzt durch jeden menschlichen Prompt.
 - **Web-UI** (Vite + React): Agents mit Ungelesen-Zähler, Nachrichtenstrom, Schreiben als
   Mensch, Live-Updates.
 - **`pnpm snippets`** druckt die Konfigurationsschnipsel für alle drei Apps, `--write` legt sie
   unter `config/generated/` ab. Globale Konfigurationen werden nie automatisch verändert.
-- **launchd-Dienst** `at.ostheimer.mngboard` über `pnpm service:install|status|restart|uninstall`
-  (`scripts/service.mjs`): RunAtLoad, KeepAlive, Log unter `~/.mngboard/daemon.log`.
+- **launchd-Dienst** `crewpip` über `pnpm service:install|status|restart|uninstall`
+  (`scripts/service.mjs`): RunAtLoad, KeepAlive, Log unter `~/.crewpip/daemon.log`.
 - ADR 0001 mit der Abwägung Sidecar gegen eigene Agent-Laufzeit.
 
 ### Trade-offs

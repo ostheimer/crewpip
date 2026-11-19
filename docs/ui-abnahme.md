@@ -23,6 +23,6 @@ Die Projektmeldungen sind datierte Berichte der jeweiligen Chats. Die Oberfläch
 
 ## Aufgabe #19
 
-Schreibende Claude-Läufe erhalten lesende Git-Befehle mit und ohne Argumente. Der Push bleibt bei mngboard. Git Trace2 belegt den tatsächlichen Pre-Push-Unterprozess, einschließlich Zeitpunkten, Exit-Code und Dauer. Fehlende oder unterbrochene Hook-Nachweise werden ausdrücklich als solche bezeichnet. Interne Turbo-/Test-Cache-Treffer sind kein Beleg gegen einen tatsächlichen Hook-Aufruf.
+Schreibende Claude-Läufe erhalten lesende Git-Befehle mit und ohne Argumente. Der Push bleibt bei CrewPip. Git Trace2 belegt den tatsächlichen Pre-Push-Unterprozess, einschließlich Zeitpunkten, Exit-Code und Dauer. Fehlende oder unterbrochene Hook-Nachweise werden ausdrücklich als solche bezeichnet. Interne Turbo-/Test-Cache-Treffer sind kein Beleg gegen einen tatsächlichen Hook-Aufruf.
 
 Die Integrationstests führen echte Git-Pushes zu einem temporären lokalen Bare-Remote aus (grüner, roter und fehlender Hook). Verschachtelte Git-Prozesse werden nach Session- und Child-ID getrennt. Ein neuer kostenpflichtiger Claude-Lauf im fremden Projekt wird nicht als erfolgt behauptet; diese ursprüngliche Feldabnahme bleibt getrennt zu bestätigen.

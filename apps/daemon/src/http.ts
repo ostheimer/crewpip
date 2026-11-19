@@ -14,7 +14,7 @@ import {
   type SessionRole,
   type TaskStatus,
   type WsEvent,
-} from "@mngboard/shared";
+} from "@crewpip/shared";
 import { config } from "./config.js";
 import { Inbox } from "./inbox.js";
 import type { Board } from "./board.js";
@@ -156,7 +156,7 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
         break;
     }
 
-    // Teilen sich mehrere Chats dieser App Prozess und Verzeichnis, kann mngboard sie am
+    // Teilen sich mehrere Chats dieser App Prozess und Verzeichnis, kann CrewPip sie am
     // Aufruf nicht trennen. Dann bekommt dieser Chat seinen Sitzungsschlüssel in den Kontext,
     // und zwar nur über diesen Weg.
     //
@@ -237,7 +237,7 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
           { human: String((req.body as { by?: string }).by || "Mensch") },
           `session:${task.assignee.id}`,
           `Aufgabe #${task.id} ist dir zugewiesen: ${task.title}${task.body ? `\n\n${task.body}` : ""}${worktree}` +
-            `\n\nStand mit dem MCP-Tool mngboard update_task fortschreiben (status "review", wenn du fertig bist).`,
+            `\n\nStand mit dem MCP-Tool crewpip update_task fortschreiben (status "review", wenn du fertig bist).`,
         );
       }
       res.json(task);
@@ -341,7 +341,7 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
         return;
       }
       let html = fs.readFileSync(indexPath, "utf8");
-      html = html.replace("</head>", `<script>window.__MNGBOARD_TOKEN__=${JSON.stringify(token)}</script></head>`);
+      html = html.replace("</head>", `<script>window.__CREWPIP_TOKEN__=${JSON.stringify(token)}</script></head>`);
       res.type("html").send(html);
     };
     app.get("/", sendIndex);
@@ -361,7 +361,7 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
       if (opts.authDisabled || !token) return done(true);
       // Der Browser kann bei WebSockets keine Kopfzeilen setzen, deshalb hier über die Adresse.
       // req ist eine rohe IncomingMessage ohne Express-Methoden: Kopfzeilen direkt lesen.
-      const header = req.headers["x-mngboard-token"];
+      const header = req.headers["x-crewpip-token"];
       const given =
         new URL(req.url ?? "/", "http://x").searchParams.get("token") ??
         (Array.isArray(header) ? header[0] : header) ??
@@ -391,10 +391,10 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
   runner.on("finished", (run) => {
     if (!run.startedBy) return;
     try {
-      // Wenn der Lauf selbst eine Session angemeldet hat, berichtet sie; sonst mngboard.
+      // Wenn der Lauf selbst eine Session angemeldet hat, berichtet sie; sonst crewpip.
       const own = inbox.sessionOfRun(run.id);
       inbox.post(
-        own ? { sessionId: own } : { human: "mngboard" },
+        own ? { sessionId: own } : { human: "crewpip" },
         `session:${run.startedBy.id}`,
         `Lauf #${run.id} (${run.app}, ${run.mode}) ist ${run.status}.` +
           `${run.taskId ? ` Aufgabe #${run.taskId}.` : ""}` +

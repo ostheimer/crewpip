@@ -6,7 +6,7 @@ CrewPip ist ein lokales Board für Projekte, Aufgaben und Nachrichten zwischen C
 
 ## Auf dem Mac installieren
 
-Du brauchst Git, Node.js mit integriertem SQLite (z. B. Node.js 24) und pnpm 10.29.2. Klone das Repository in einen Ordner, in dem es dauerhaft bleiben kann. Der Dienst und die Hooks verwenden den Pfad zu diesem Ordner.
+Du brauchst Git, Node.js ab 22.18 aus der 22er-Reihe oder ab 24 mit integriertem SQLite und pnpm 10.29.2. Klone das Repository in einen Ordner, in dem es dauerhaft bleiben kann. Der Dienst und die Hooks verwenden den Pfad zu diesem Ordner.
 
 ```bash
 git clone https://github.com/ostheimer/crewpip.git
@@ -17,7 +17,11 @@ pnpm service:install
 
 Öffne [das lokale Board](http://127.0.0.1:7357). Der Dienst startet künftig bei der Anmeldung. Mit `pnpm service:status` kannst du seinen Zustand prüfen.
 
-Bei einem Wechsel von mngboard verwendet CrewPip denselben Datenordner, Dienstnamen und MCP-Endpunkt. Bestehende Hooks können weiterhin auf den bisherigen Checkout zeigen.
+### Bestehende Installation umstellen
+
+Bewahre den bisherigen lauffähigen Checkout samt Abhängigkeiten bis zur erfolgreichen Dienstprüfung auf. Der Umzug verwendet das Python 3 der macOS Command Line Tools für den atomaren Austausch der Konfigurationsdateien. Führe im neuen Checkout `pnpm install --frozen-lockfile`, `pnpm build` und `pnpm service:migrate --check` aus. Sobald die aktiven Läufe beendet sind, starte `pnpm service:migrate`. Der Umzug sichert den Bestand unter `~/.crewpip-migration-backups/` und übernimmt Datenbank samt WAL, Token, Protokolle, Sicherungen und verwaltete Git-Worktrees. Ein laufender Login-Dienst startet unter `crewpip`. Einen zuvor gestoppten Dienst startest du mit `pnpm service:install`.
+
+Der Umzug aktualisiert vorhandene globale MCP- und Hook-Einträge von Claude Code und Codex. Lade die MCP-Verbindungen neu und prüfe die vier geänderten Codex-Hooks unter `/hooks`. Für projektlokale Einstellungen und Cursor verwende die neuen Snippets. Nach einem unterbrochenen Umzug prüfst du die genannte Sicherung und führst `pnpm service:migrate --recover` aus. Bleibt der Altdienst nach einer Rücknahme gestoppt, stelle seinen bisherigen Checkout samt Build wieder her und führe dort `pnpm service:install` aus. Die Sicherung enthält auch den zwischenzeitlichen Datenstand eines bereits gestarteten neuen Dienstes.
 
 ## Den ersten Chat verbinden
 
@@ -50,9 +54,9 @@ apps/web      React-UI (Vite): Agents, Nachrichtenstrom, Schreiben als Mensch
 packages/shared  gemeinsame Typen
 ```
 
-Das Subjekt in mngboard ist die **Session**: ein Chat-Fenster in einer App, erkannt an
+Das Subjekt in CrewPip ist die **Session**: ein Chat-Fenster in einer App, erkannt an
 App, Projektordner und Session-ID. Angezeigt wird sie als `Claude · example-project / api-worker`.
-Der Name ist frei wählbar (Web-UI, Stift-Symbol, oder `MNGBOARD_SESSION_NAME` im Hook-Umfeld),
+Der Name ist frei wählbar (Web-UI, Stift-Symbol, oder `CREWPIP_SESSION_NAME` im Hook-Umfeld),
 Standard ist die Startzeit.
 
 Nachrichten gehen an eine Session (`session:<id>`), ein Projekt (`project:<name>`), eine App
@@ -67,9 +71,9 @@ und Prozess-ID. Folgen: Fenster erscheinen, ohne dass erst ein Hook feuern muss,
 geschlossene Fenster verschwinden von selbst, und Worktrees unter
 `<projekt>/.claude/worktrees/<name>` erscheinen beim richtigen Repository statt unter ihrem
 eigenen Ordnernamen. Das Dateiformat ist nicht dokumentiert; fehlt es oder ändert es sich,
-arbeitet mngboard nur mit den Hooks weiter.
+arbeitet CrewPip nur mit den Hooks weiter.
 
-Beim Namen gilt: ein ausdrücklich gesetzter Name (mngboard-UI oder `/rename` in Claude Code)
+Beim Namen gilt: ein ausdrücklich gesetzter Name (CrewPip-UI oder `/rename` in Claude Code)
 wird nie von einem automatisch abgeleiteten überschrieben.
 
 Bei MCP-Aufrufen schickt keine der Apps eine Session-ID mit. Der Daemon fragt deshalb das
@@ -89,7 +93,7 @@ welche Session du bist“).
 über **einen** Prozess, und die MCP-Anfrage trägt kein Thread-Merkmal (gemessen: nur accept,
 content-length, content-type, host, mcp-protocol-version, user-agent und das Token; kein
 `mcp-session-id`). Arbeiten dann zwei Chats im gleichen Verzeichnis, sind sie am Aufruf nicht
-zu unterscheiden. Für genau diesen Fall erzeugt mngboard je Chat einen Sitzungsschlüssel und
+zu unterscheiden. Für genau diesen Fall erzeugt CrewPip je Chat einen Sitzungsschlüssel und
 nennt ihn **nur über den Hook dieses Chats**. Alle Tools haben dafür das optionale Feld
 `session_key`; er schlägt Prozess und Verzeichnis. Ein unbekannter Schlüssel wird abgelehnt und
 fällt nicht auf das Verzeichnis zurück. Der Hinweis erscheint nur, solange die Mehrdeutigkeit
@@ -107,7 +111,7 @@ Sternchen bzw. für das gemeinsame Projekt. Gibt es gar keine Session, legt der 
 | Automatisch erkannt | ja, über die Session-Registry | nein, erst per Hook | nein, erst per Hook |
 | Aktiv warten | `wait_for_message` (bis 50 s) | `wait_for_message` (bis 50 s) | `wait_for_message` (bis 50 s) |
 
-Schleifensperre: Am Turn-Ende lässt der Daemon höchstens `MNGBOARD_MAX_STOP_CONTINUATIONS`
+Schleifensperre: Am Turn-Ende lässt der Daemon höchstens `CREWPIP_MAX_STOP_CONTINUATIONS`
 (Standard 10) Fortsetzungen pro Agent zu, bis wieder ein menschlicher Prompt kommt. Liegen
 gebliebene Nachrichten kommen dann beim nächsten Prompt.
 
@@ -121,13 +125,13 @@ fand sich kein sicherer Weg. Entscheidung: nicht einbauen.
 
 ## Auf einem weiteren Rechner
 
-mngboard läuft nur auf macOS (launchd für den Dienst, `lsof` und `ps` für die Erkennung des
+CrewPip läuft nur auf macOS (launchd für den Dienst, `lsof` und `ps` für die Erkennung des
 Aufrufers). Einrichten: Repository klonen, „Starten“ und „Apps anbinden“ durchgehen. Die
 Hook-Einträge enthalten den absoluten Pfad zum Repository und werden deshalb je Rechner mit
-`pnpm snippets` neu erzeugt; Token und Datenbank entstehen je Rechner neu unter `~/.mngboard`.
+`pnpm snippets` neu erzeugt; Token und Datenbank entstehen je Rechner neu unter `~/.crewpip`.
 
 Jeder Rechner hat damit sein **eigenes Board**. Nachrichten und Aufgaben werden nicht
-abgeglichen, und Chats auf zwei Rechnern erreichen einander über mngboard nicht.
+abgeglichen, und Chats auf zwei Rechnern erreichen einander über CrewPip nicht.
 
 ## Starten
 
@@ -139,8 +143,8 @@ pnpm service:install
 ```
 
 Weitere Befehle: `pnpm service:status`, `pnpm service:restart` (baut vorher neu),
-`pnpm service:uninstall`. Der Dienst heißt `at.ostheimer.mngboard`, die Plist liegt unter
-`~/Library/LaunchAgents/`, das Log unter `~/.mngboard/daemon.log`.
+`pnpm service:uninstall`. Der Dienst heißt `crewpip`, die Plist liegt unter
+`~/Library/LaunchAgents/`, das Log unter `~/.crewpip/daemon.log`.
 
 Von Hand: `pnpm build && node apps/daemon/dist/index.js`. Entwicklung: `pnpm dev` startet
 Daemon (tsx watch) und Vite (Port 5173, proxyt auf den Daemon); vorher den Dienst stoppen,
@@ -148,11 +152,11 @@ sonst ist der Port belegt.
 
 Daemon läuft auf `http://127.0.0.1:7357`, die Web-UI liegt unter derselben Adresse.
 
-Datenbank: `~/.mngboard/mngboard.db` (SQLite über `node:sqlite`, Node 22.5 oder neuer).
+Datenbank: `~/.crewpip/crewpip.db` (SQLite über `node:sqlite`, Node 22 ab 22.18 oder Node ab 24).
 
 ## Zugangsschutz
 
-Der Daemon verlangt ein Token. Es steht in `~/.mngboard/token` (nur für dich lesbar) und wird
+Der Daemon verlangt ein Token. Es steht in `~/.crewpip/token` (nur für dich lesbar) und wird
 beim ersten Start erzeugt.
 
 **Was das Token leistet und was nicht.** Es hält Webseiten fern, die im Browser auf
@@ -164,19 +168,19 @@ Dazu kommen zwei Prüfungen, die auch ohne Token greifen:
 
 - **Host-Kopf**: Nur `127.0.0.1`, `localhost` und `[::1]` werden bedient. Ohne das könnte
   eine Domain, die auf `127.0.0.1` zeigt (DNS-Rebinding), aus dem Browser heraus als gleiche
-  Herkunft gelten. Weitere Hosts über `MNGBOARD_ALLOWED_HOSTS`.
+  Herkunft gelten. Weitere Hosts über `CREWPIP_ALLOWED_HOSTS`.
 - **Herkunft**: Anfragen mit fremdem `Origin` werden abgewiesen, auch mit gültigem Token.
 
 Wer das Token woher bekommt:
 
 | Client | Weg |
 |---|---|
-| Weboberfläche | Der Daemon setzt es beim Ausliefern der Startseite ein; die Seite schickt es als Kopfzeile `x-mngboard-token`, der WebSocket über die Adresse. |
-| Hook-Skript | Liest `~/.mngboard/token` selbst. **Die Hook-Konfiguration ändert sich dadurch nicht** — wichtig bei Codex, wo jede Änderung eine neue `/hooks`-Freigabe erzwingen würde. |
-| MCP-Clients | Kopfzeile `x-mngboard-token` in der Serverkonfiguration; `pnpm snippets` erzeugt sie mit dem Token. |
-| Eigene Aufrufe | `curl -H "x-mngboard-token: $(cat ~/.mngboard/token)" …` |
+| Weboberfläche | Der Daemon setzt es beim Ausliefern der Startseite ein; die Seite schickt es als Kopfzeile `x-crewpip-token`, der WebSocket über die Adresse. |
+| Hook-Skript | Liest `~/.crewpip/token` selbst. **Die Hook-Konfiguration ändert sich dadurch nicht** — wichtig bei Codex, wo jede Änderung eine neue `/hooks`-Freigabe erzwingen würde. |
+| MCP-Clients | Kopfzeile `x-crewpip-token` in der Serverkonfiguration; `pnpm snippets` erzeugt sie mit dem Token. |
+| Eigene Aufrufe | `curl -H "x-crewpip-token: $(cat ~/.crewpip/token)" …` |
 
-`MNGBOARD_AUTH=off` schaltet den Schutz ab. Das ist zur Fehlersuche gedacht, nicht für den
+`CREWPIP_AUTH=off` schaltet den Schutz ab. Das ist zur Fehlersuche gedacht, nicht für den
 Betrieb: ohne Token kann jede Webseite Agents in deinen Worktrees starten.
 
 ## Datenbank-Umzüge
@@ -186,7 +190,7 @@ Schemaänderungen laufen über eine nummerierte Kette in
 an, was noch fehlt, und hält es in `schema_migrations` fest.
 
 - **Vor dem ersten offenen Umzug wird gesichert**, mit `VACUUM INTO` in
-  `~/.mngboard/backups/`. Das ergibt einen in sich stimmigen Stand, anders als ein Kopieren
+  `~/.crewpip/backups/`. Das ergibt einen in sich stimmigen Stand, anders als ein Kopieren
   der Datei bei eingeschaltetem WAL. Die letzten zehn Sicherungen bleiben liegen.
 - **Scheitert die Sicherung, wird nicht umgezogen.**
 - **Jeder Umzug läuft in einer eigenen Transaktion** und wird erst danach eingetragen. Bricht
@@ -219,8 +223,8 @@ hat in einer Mac-App-Session gegriffen.
 
 ```bash
 claude mcp add -s user --transport http \
-  --header "x-mngboard-token: $(cat ~/.mngboard/token)" \
-  mngboard "http://127.0.0.1:7357/mcp/claude?app=claude"
+  --header "x-crewpip-token: $(cat ~/.crewpip/token)" \
+  crewpip "http://127.0.0.1:7357/mcp/claude?app=claude"
 ```
 
 Ohne die Kopfzeile lehnt der Daemon jeden Aufruf mit 401 ab (siehe Zugangsschutz).
@@ -240,15 +244,15 @@ Sitzungsstart; dafür ist dort `loop_limit` auf 10 gesetzt.
 **Codex** (ChatGPT-App, CLI und IDE-Erweiterung teilen sich diese Konfiguration)
 
 ```bash
-codex mcp add mngboard --url "http://127.0.0.1:7357/mcp/codex?app=codex"
+codex mcp add crewpip --url "http://127.0.0.1:7357/mcp/codex?app=codex"
 ```
 
 Danach das Token als Kopfzeile in `~/.codex/config.toml` eintragen; den fertigen Block mit
-`[mcp_servers.mngboard.http_headers]` druckt `pnpm snippets`. Ohne ihn antwortet der Daemon
+`[mcp_servers.crewpip.http_headers]` druckt `pnpm snippets`. Ohne ihn antwortet der Daemon
 mit 401.
 
 Hooks aus `config/generated/codexHooks.json` in `~/.codex/hooks.json` einfügen. **Danach in
-einer interaktiven Codex-Sitzung `/hooks` ausführen und die vier mngboard-Hooks freigeben.**
+einer interaktiven Codex-Sitzung `/hooks` ausführen und die vier CrewPip-Hooks freigeben.**
 Ohne Freigabe liest Codex die Datei zwar, führt die Hooks aber stillschweigend nicht aus.
 Das Vertrauen hängt an der Prüfsumme: Jede spätere Änderung an `hooks.json` macht eine neue
 Freigabe nötig. Für Automatisierung gibt es `--dangerously-bypass-hook-trust`.
@@ -303,21 +307,21 @@ Jede zugestellte Nachricht nennt ihre Antwortadresse (`antworten an: session:…
 
 | Variable | Standard | Bedeutung |
 |---|---|---|
-| `MNGBOARD_HOST` | `127.0.0.1` | Nur lokal lauschen. Wer das öffnet, braucht zuerst Auth. |
-| `MNGBOARD_PORT` | `7357` | Port |
-| `MNGBOARD_DB` | `~/.mngboard/mngboard.db` | SQLite-Datei |
-| `MNGBOARD_MAX_STOP_CONTINUATIONS` | `10` | Schleifensperre am Turn-Ende |
-| `MNGBOARD_MAX_WAIT_SECONDS` | `50` | Obergrenze für `wait_for_message` |
-| `MNGBOARD_URL` (Hook, Vite) | `http://127.0.0.1:7357` | Daemon-Adresse |
-| `MNGBOARD_SESSION_NAME` (Hook) | Startzeit | Anzeigename der Session |
-| `MNGBOARD_CLAUDE_SESSIONS` | `~/.claude/sessions` | Session-Registry von Claude Code |
-| `MNGBOARD_RUN_TIMEOUT_MS` | `1800000` | Zeitlimit je Agent-Lauf |
-| `MNGBOARD_CLAUDE_MAX_TURNS` | `40` | Zugrunde gelegte Höchstzahl an Zügen |
-| `MNGBOARD_CODEX_BYPASS_HOOK_TRUST` | aus | umgeht die Hook-Freigabe für gestartete Läufe |
-| `MNGBOARD_RUNS_PER_HOUR` | `20` | Läufe je Session und Stunde |
-| `MNGBOARD_TOKEN` / `MNGBOARD_TOKEN_FILE` | `~/.mngboard/token` | Zugangstoken |
-| `MNGBOARD_ALLOWED_HOSTS` | leer | zusätzlich erlaubte Host-Köpfe, kommagetrennt |
-| `MNGBOARD_AUTH` | an | `off` schaltet den Zugangsschutz ab |
+| `CREWPIP_HOST` | `127.0.0.1` | Nur lokal lauschen. Wer das öffnet, braucht zuerst Auth. |
+| `CREWPIP_PORT` | `7357` | Port |
+| `CREWPIP_DB` | `~/.crewpip/crewpip.db` | SQLite-Datei |
+| `CREWPIP_MAX_STOP_CONTINUATIONS` | `10` | Schleifensperre am Turn-Ende |
+| `CREWPIP_MAX_WAIT_SECONDS` | `50` | Obergrenze für `wait_for_message` |
+| `CREWPIP_URL` (Hook, Vite) | `http://127.0.0.1:7357` | Daemon-Adresse |
+| `CREWPIP_SESSION_NAME` (Hook) | Startzeit | Anzeigename der Session |
+| `CREWPIP_CLAUDE_SESSIONS` | `~/.claude/sessions` | Session-Registry von Claude Code |
+| `CREWPIP_RUN_TIMEOUT_MS` | `1800000` | Zeitlimit je Agent-Lauf |
+| `CREWPIP_CLAUDE_MAX_TURNS` | `40` | Zugrunde gelegte Höchstzahl an Zügen |
+| `CREWPIP_CODEX_BYPASS_HOOK_TRUST` | aus | umgeht die Hook-Freigabe für gestartete Läufe |
+| `CREWPIP_RUNS_PER_HOUR` | `20` | Läufe je Session und Stunde |
+| `CREWPIP_TOKEN` / `CREWPIP_TOKEN_FILE` | `~/.crewpip/token` | Zugangstoken |
+| `CREWPIP_ALLOWED_HOSTS` | leer | zusätzlich erlaubte Host-Köpfe, kommagetrennt |
+| `CREWPIP_AUTH` | an | `off` schaltet den Zugangsschutz ab |
 
 ## Tests
 
@@ -328,7 +332,7 @@ pnpm typecheck && pnpm test
 ## Rollen
 
 [docs/rollen.md](docs/rollen.md) beschreibt die Arbeitsteilung: ein **Director** quer über
-alle Projekte, ein **PM** je Repository, **Worker** für die Umsetzung. mngboard kennt diese
+alle Projekte, ein **PM** je Repository, **Worker** für die Umsetzung. CrewPip kennt diese
 Rollen als Feld an der Session.
 
 - Die Rolle ergibt sich aus dem Sitzungsnamen: `Director`, `PM <repo>`, `Worker <repo>`.
@@ -353,8 +357,8 @@ behalten sie, damit sichtbar bleibt, wer sie bearbeitet hat. Wird eine Aufgabe e
 zugewiesen, bekommt diese Session eine Nachricht über den normalen Weg, also an ihrer nächsten
 Turn-Grenze.
 
-**Worktrees** legt mngboard auf Knopfdruck an, unter
-`<projekt>/.mngboard/worktrees/<id>-<titel>` mit dem Branch `mngboard/<id>-<titel>`,
+**Worktrees** legt CrewPip auf Knopfdruck an, unter
+`<projekt>/.crewpip/worktrees/<id>-<titel>` mit dem Branch `crewpip/<id>-<titel>`,
 abgezweigt von `main` oder `master`. Beim Entfernen gilt:
 
 - Nicht committete Änderungen oder Commits, die nicht in `main` sind, blockieren das
@@ -362,7 +366,7 @@ abgezweigt von `main` oder `master`. Beim Entfernen gilt:
 - Ein Branch ohne eigene Commits wird mitgelöscht, ein Branch mit eigenen Commits bleibt
   stehen, damit nichts verloren geht.
 
-mngboard startet keine Chat-Fenster. Es bereitet den Worktree vor; das Fenster öffnest du
+CrewPip startet keine Chat-Fenster. Es bereitet den Worktree vor; das Fenster öffnest du
 dort selbst. Die Session, die in einem Worktree läuft, wird der Aufgabe automatisch
 zugeordnet und in der Seitenleiste mit ihr angezeigt.
 
@@ -370,10 +374,10 @@ Nur lesende git-Befehle laufen ungefragt. Geschrieben wird ausschließlich mit
 `worktree add`, `worktree remove` und `branch -d`; es gibt keinen Aufruf, der Commits oder
 fremde Branches anfassen kann.
 
-## Agents aus mngboard starten
+## Agents aus CrewPip starten
 
 Über den Knopf **Agent starten** an einer Aufgabe, oder über das MCP-Werkzeug `start_run`,
-startet mngboard ein Coding-Werkzeug als eigenen Prozess, liest seine Ausgabe mit und zeigt sie live. Ist der Lauf fertig, wandert die
+startet CrewPip ein Coding-Werkzeug als eigenen Prozess, liest seine Ausgabe mit und zeigt sie live. Ist der Lauf fertig, wandert die
 Aufgabe von „in Arbeit" auf „zu prüfen"; entschieden wird von dir, nicht vom Agent.
 
 **Rechte.** Es gibt genau zwei Stufen, sichtbar bei jedem Lauf gespeichert. Welche Befehle
@@ -384,7 +388,7 @@ ein schreibender Lauf ausführen darf, steht unter „Befehle in schreibenden L�
 | nur lesen | `--sandbox read-only` | `--permission-mode plan` | darf lesen und antworten, nichts ändern |
 | im Worktree schreiben | `--sandbox workspace-write` | `--permission-mode acceptEdits` | darf Dateien im Arbeitsverzeichnis ändern |
 
-Eine Stufe ohne Sandbox und ohne Rückfragen bietet mngboard **nicht** an. Wer das braucht,
+Eine Stufe ohne Sandbox und ohne Rückfragen bietet CrewPip **nicht** an. Wer das braucht,
 startet den Agent selbst im Terminal.
 
 Stößt eine Session einen Lauf an, bekommt sie eine Nachricht, sobald er fertig ist — über
@@ -396,16 +400,16 @@ denselben Zustellweg wie alles andere. Aktives Warten ist unnötig.
   `allowProjectRoot` erreichbar, das die Oberfläche nicht anbietet.
 - Ein Lauf kann das Projektverzeichnis nicht verlassen.
 - Höchstens vier Läufe gleichzeitig, danach wird abgelehnt.
-- Zeitlimit je Lauf, Standard 30 Minuten (`MNGBOARD_RUN_TIMEOUT_MS`).
+- Zeitlimit je Lauf, Standard 30 Minuten (`CREWPIP_RUN_TIMEOUT_MS`).
 - Abbrechen jederzeit über die Oberfläche.
 - **Ein Lauf startet keine Läufe.** Eine Session, die aus einem Lauf hervorgegangen ist, wird
   beim Startversuch abgewiesen. Damit bleibt die Tiefe bei eins, und die Zahl gleichzeitiger
   Agents kann sich nicht mit jeder Stufe vervielfachen.
-- **Obergrenze je Stunde** für Läufe, die eine Session anstößt (`MNGBOARD_RUNS_PER_HOUR`,
+- **Obergrenze je Stunde** für Läufe, die eine Session anstößt (`CREWPIP_RUNS_PER_HOUR`,
   Standard 20). Aus der Oberfläche gilt sie nicht.
 - **Jeder Lauf trägt, wer ihn angestoßen hat**, in der Oberfläche und in `list_runs`.
   Abbrechen darf nur, wer ihn gestartet hat.
-- Jeder Lauf wird vollständig unter `~/.mngboard/runs/<id>.jsonl` mitgeschrieben.
+- Jeder Lauf wird vollständig unter `~/.crewpip/runs/<id>.jsonl` mitgeschrieben.
 
 **Anmeldung.** Die Oberfläche zeigt je Werkzeug, ob es gefunden und angemeldet ist; ein nicht
 angemeldetes Werkzeug lässt sich gar nicht erst starten.
@@ -425,14 +429,14 @@ angemeldetes Werkzeug lässt sich gar nicht erst starten.
 Der Dienst braucht `/opt/homebrew/bin` im Suchpfad, sonst findet er global installierte
 Programme nicht. `pnpm service:install` schreibt das mit in die Plist.
 
-Damit ein gestarteter Agent auch Nachrichten empfängt, muss er die mngboard-Hooks ausführen.
+Damit ein gestarteter Agent auch Nachrichten empfängt, muss er die CrewPip-Hooks ausführen.
 Bei Codex heißt das: einmal `/hooks` freigeben. Ohne Freigabe läuft der Agent normal, bekommt
-aber keine Postfach-Zustellung. `MNGBOARD_CODEX_BYPASS_HOOK_TRUST=1` umgeht die Freigabe für
+aber keine Postfach-Zustellung. `CREWPIP_CODEX_BYPASS_HOOK_TRUST=1` umgeht die Freigabe für
 gestartete Läufe; standardmäßig ist das aus.
 
 ## Warum es keine Sofortzustellung gibt
 
-mngboard hat Nachrichten früher zusätzlich direkt in den Inbox-Socket einer Claude-Code-Sitzung
+CrewPip hat Nachrichten früher zusätzlich direkt in den Inbox-Socket einer Claude-Code-Sitzung
 geschrieben. Dieser Weg ist entfernt, weil er nicht funktioniert und trotzdem als zugestellt
 verbucht wurde.
 
@@ -452,7 +456,7 @@ Das Zustellprotokoll zeigt das jetzt so an, statt „sofort" zu behaupten. Älte
 
 Wer die Sofortzustellung zurückhaben will, müsste `crossSessionInbound` auf `accept` setzen.
 Das erlaubt jedem lokalen Programm, ohne Bestätigung Text in laufende Sitzungen zu schreiben —
-bewusst nicht die Voreinstellung, und nichts, was mngboard selbst ändert.
+bewusst nicht die Voreinstellung, und nichts, was CrewPip selbst ändert.
 
 ## Befehle in schreibenden Läufen
 
@@ -461,12 +465,12 @@ unabhängig von der Freigabeliste des Projekts (entschieden am 18.09.2026):
 
 | Erlaubt | Nicht erlaubt |
 |---|---|
-| `git add`, `git commit`, `git status`, `git diff`, `git log` | **jeder `git push`** — den übernimmt mngboard |
+| `git add`, `git commit`, `git status`, `git diff`, `git log` | **jeder `git push`** — den übernimmt CrewPip |
 | `pnpm install`, `test`, `typecheck`, `lint`, `format`, `format:check`, auch mit `--filter` | `pnpm run`, `pnpm exec`, `pnpm dlx`: das wären beliebige Skripte |
 
 **Warum der Agent nicht selbst pusht.** Befehlsmuster lassen sich umgehen. Belegt am 18.09.2026
-mit einem echten Lauf: `git push origin mngboard/x:main` ging trotz Verbotsregel durch und
-schrieb auf `main`. Deshalb darf der Agent gar nicht pushen, und mngboard pusht nach einem
+mit einem echten Lauf: `git push origin crewpip/x:main` ging trotz Verbotsregel durch und
+schrieb auf `main`. Deshalb darf der Agent gar nicht pushen, und CrewPip pusht nach einem
 erfolgreichen Lauf selbst — genau den Branch der Aufgabe, mit fester Argumentliste und ohne
 Shell. Auf `main` oder fremde Branches kommt dieser Weg nicht.
 
@@ -476,11 +480,11 @@ nichts committet, wird nichts gepusht. Das Push-Ergebnis steht am Lauf.
 
 **Bootstrap je Projekt.** Ein frischer Worktree hat kein `node_modules`; ohne das laufen weder
 Tests noch Hooks. Am Projekt lässt sich ein Befehl hinterlegen, der nach dem Anlegen im Worktree
-läuft, etwa `pnpm install --frozen-lockfile`. Er wird in mngboard gepflegt und nicht aus dem
+läuft, etwa `pnpm install --frozen-lockfile`. Er wird in CrewPip gepflegt und nicht aus dem
 Repository gelesen, damit kein Repository bestimmt, was der Daemon ausführt.
 
 **Codex** hat keine Befehlsliste, sondern eine Sandbox, die nur im Worktree schreiben lässt.
-Das gemeinsame Git-Verzeichnis liegt aber außerhalb, deshalb gibt mngboard genau die vier
+Das gemeinsame Git-Verzeichnis liegt aber außerhalb, deshalb gibt CrewPip genau die vier
 Stellen frei, die ein Commit schreibt (gemessen): `objects`, der eigene Branch unter
 `refs/heads` und `logs/refs/heads`, und das Verwaltungsverzeichnis des Worktrees. `config` und
 `hooks` bleiben gesperrt, sonst könnte der Agent die Hooks abschalten. Netzwerk bleibt aus.
@@ -498,13 +502,13 @@ Praktisch heißt das:
 
 - Nachrichten eignen sich, um eine Session zu **informieren** („Migration 0042 ist auf main").
 - Soll eine Session **handeln**, muss der Mensch das im eigenen Prompt sagen, etwa
-  „erledige, was in meinem mngboard-Postfach steht". Genau so funktioniert es zuverlässig.
+  „erledige, was in meinem CrewPip-Postfach steht". Genau so funktioniert es zuverlässig.
 
 ## Noch offen
 
 - Cursor ist auf diesem Mac nicht installiert; die Cursor-Pfade sind nur gegen die Doku
   geprüft, nicht im Betrieb.
-- Codex `turn/steer` über den App-Server für Threads, die mngboard selbst startet (Variante B).
+- Codex `turn/steer` über den App-Server für Threads, die CrewPip selbst startet (Variante B).
 - Claude Code Channels, sobald sie aus der Research Preview sind.
 - Aufgaben über Projektgrenzen hinweg verknüpfen (Abhängigkeiten, Reihenfolge).
 - Läufe fortsetzen statt neu starten (Codex `turn/steer`, Claude `--resume`).
@@ -514,9 +518,6 @@ Praktisch heißt das:
 
 Der Einstieg ist der Überblick unter `http://127.0.0.1:7357`. „Director schreiben“ adressiert die Koordination, „Aufgabe planen“ legt einen Auftrag im gewählten Projekt an. Nachrichten werden beim nächsten Kontakt des Empfänger-Chats zugestellt; das Board startet damit keinen Chat automatisch. Details und Abnahmen: [Oberfläche und Abnahme](docs/ui-abnahme.md).
 
-## Urheber und neutrale Beispiele
+## Beispiele und Prüfberichte
 
-Entwickelt von Andreas Ostheimer. Projekt- und Personennamen in Beispielen und Tests sind
-fiktiv. Historische Prüfberichte sind für die Weitergabe anonymisiert; daraus folgt keine
-Abnahme für die Installation auf einem anderen Rechner. Der Dienstname
-`at.ostheimer.mngboard` bezeichnet das Produkt, nicht ein benötigtes Benutzerkonto.
+Projekt- und Personennamen in Beispielen und Tests sind fiktiv. Historische Prüfberichte sind für die Weitergabe anonymisiert. Die lokale Installation wird mit `pnpm service:status` geprüft.

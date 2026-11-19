@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { type AppKind, type Project, type Run, type RunItem, type Session, type Task, type TaskStatus } from "@mngboard/shared";
+import { type AppKind, type Project, type Run, type RunItem, type Session, type Task, type TaskStatus } from "@crewpip/shared";
 import { useBoardLanguage } from "./language.tsx";
 import { displayError } from "./errors.ts";
 import { api } from "./api.ts";

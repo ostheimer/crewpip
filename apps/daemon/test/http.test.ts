@@ -25,7 +25,7 @@ const probe: ProcessProbe = { owner: async () => proc.caller, agentChain: async 
 before(async () => {
   const db = openDb(":memory:");
   const board = new Board(db);
-  const runner = new Runner(db, board, { logDir: fs.mkdtempSync(path.join(os.tmpdir(), "mngboard-runs-")), timeoutMs: 5000, log: (l) => logs.push(l) });
+  const runner = new Runner(db, board, { logDir: fs.mkdtempSync(path.join(os.tmpdir(), "crewpip-runs-")), timeoutMs: 5000, log: (l) => logs.push(l) });
   daemon = createDaemon(new Inbox(db, board), board, runner, { log: (l) => logs.push(l), token: TOKEN, probe });
   await new Promise<void>((r) => daemon.server.listen(0, "127.0.0.1", r));
   base = `http://127.0.0.1:${(daemon.server.address() as net.AddressInfo).port}`;
@@ -38,7 +38,7 @@ async function mcpClient(app: string) {
   const client = new Client({ name: "test", version: "0.0.0" });
   await client.connect(
     new StreamableHTTPClientTransport(new URL(`${base}/mcp/${app}?app=${app}`), {
-      requestInit: { headers: { "x-mngboard-token": TOKEN } },
+      requestInit: { headers: { "x-crewpip-token": TOKEN } },
     }),
   );
   return client;
@@ -47,7 +47,7 @@ async function mcpClient(app: string) {
 /** fetch mit Token, damit die Tests nicht an der Anmeldung scheitern. */
 function get(url: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
-  headers.set("x-mngboard-token", TOKEN);
+  headers.set("x-crewpip-token", TOKEN);
   return globalThis.fetch(url, { ...init, headers });
 }
 const text = (res: unknown) => (res as { content: { text: string }[] }).content.map((c) => c.text).join("\n");
@@ -145,7 +145,7 @@ test("API: Läufe starten, Grenzen und Verfügbarkeit", async () => {
   assert.match(((await bad.json()) as { error: string }).error, /Weder Task noch Projekt/);
 
   // Mit Stub-Programm läuft ein echter Prozess durch
-  const stubDir = fs.mkdtempSync(path.join(os.tmpdir(), "mngboard-stub-"));
+  const stubDir = fs.mkdtempSync(path.join(os.tmpdir(), "crewpip-stub-"));
   const stub = path.join(stubDir, "stub.sh");
   fs.writeFileSync(stub, `#!/bin/sh\necho '{"type":"item.completed","item":{"type":"agent_message","text":"erledigt"}}'\nexit 0`, { mode: 0o755 });
   const original = codexApp.bin;
@@ -154,7 +154,7 @@ test("API: Läufe starten, Grenzen und Verfügbarkeit", async () => {
   codexApp.loggedIn = () => true;
   try {
     // Ein Lauf braucht ein Verzeichnis, das es wirklich gibt.
-    const real = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "mngboard-proj-")));
+    const real = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "crewpip-proj-")));
     await hook("claude", "session-start", { app: "claude", sessionId: "s-real", cwd: real });
     const projects = (await (await get(`${base}/api/projects`)).json()) as { id: string; root: string }[];
     const p = projects.find((x) => x.root === real)!;
@@ -287,7 +287,7 @@ test("API: Rolle setzen und an sie adressieren", async () => {
 });
 
 test("MCP: start_run läuft nur mit Grenzen, und der Anstoßende wird benachrichtigt", async () => {
-  const real = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "mngboard-run-")));
+  const real = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "crewpip-run-")));
   await hook("claude", "session-start", { app: "claude", sessionId: "s-chef", cwd: real, name: "Director" });
 
   const stub = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "stub-")), "s.sh");

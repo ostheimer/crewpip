@@ -9,14 +9,14 @@ import path from "node:path";
  * ~/.claude/sessions/<pid>.json an (dokumentiert als "Each session registers itself in files
  * on disk", cross-session-messaging.md). Das Format selbst ist NICHT dokumentiert; hier
  * abgelesen von Version 2.1.255. Alles ist deshalb optional und fehlertolerant: Fehlt das
- * Verzeichnis oder ein Feld, arbeitet mngboard ohne Registry weiter und verlässt sich auf
+ * Verzeichnis oder ein Feld, arbeitet CrewPip ohne Registry weiter und verlässt sich auf
  * die Hooks.
  */
 export interface RegistryEntry {
   pid: number;
   sessionId: string;
   cwd: string;
-  /** Von Claude Code vergebener Name, z. B. "mngboard-55", nach /rename der eigene */
+  /** Von Claude Code vergebener Name, z. B. "CrewPip-55", nach /rename der eigene */
   name: string | null;
   /** "derived" | "auto" | "collision" | "user" | "peer" — "user" heißt: per /rename gesetzt */
   nameSource: string | null;
@@ -24,7 +24,7 @@ export interface RegistryEntry {
 }
 
 export function registryDir(): string {
-  return process.env.MNGBOARD_CLAUDE_SESSIONS ?? path.join(os.homedir(), ".claude", "sessions");
+  return process.env.CREWPIP_CLAUDE_SESSIONS ?? path.join(os.homedir(), ".claude", "sessions");
 }
 
 function pidAlive(pid: number): boolean {

@@ -58,7 +58,7 @@ test("switching language preserves the default sender's address and an open draf
     assert.equal(await page.getByRole("textbox", { name: "Message", exact: true }).inputValue(), text);
     await page.getByRole("button", { name: "Send message", exact: true }).click();
     await page.getByText("Message saved.", { exact: false }).waitFor();
-    const response = await fetch(url + "/api/messages", { headers: { "x-mngboard-token": token } });
+    const response = await fetch(url + "/api/messages", { headers: { "x-crewpip-token": token } });
     const message = (await response.json()).find((item: {text: string}) => item.text === text);
     assert.equal(message.replyTo, "human:Mensch");
     assert.equal(message.from.name, "Mensch");

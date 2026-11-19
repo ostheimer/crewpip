@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 import type { DatabaseSync } from "node:sqlite";
-import { RUN_MODES, sessionLabel, type AppKind, type Run, type RunItem, type RunMode, type RunStatus } from "@mngboard/shared";
+import { RUN_MODES, sessionLabel, type AppKind, type Run, type RunItem, type RunMode, type RunStatus } from "@crewpip/shared";
 import type { Board } from "../board.js";
 import { RUNNER_APPS, type RunnerApp } from "./apps.js";
 import * as git from "../git.js";
@@ -53,7 +53,7 @@ export interface StartOptions {
  *
  * Bewusste Grenzen:
  * - Es gibt nur zwei Rechtestufen: nur lesen oder im Arbeitsverzeichnis schreiben. Einen
- *   Modus ohne Rückfragen und ohne Sandbox bietet mngboard nicht an.
+ *   Modus ohne Rückfragen und ohne Sandbox bietet CrewPip nicht an.
  * - Schreibende Läufe verlangen einen Worktree. Der Haupt-Checkout ist nur mit
  *   ausdrücklichem allowProjectRoot erreichbar.
  * - Kein MCP-Werkzeug startet Läufe: Agents können keine Agents starten.
@@ -73,7 +73,7 @@ export class Runner extends EventEmitter<RunnerEvents> {
     private readonly db: DatabaseSync,
     private readonly board: Board,
     private readonly opts: { logDir: string; timeoutMs?: number; maxParallel?: number; log?: (l: string) => void } = {
-      logDir: path.join(process.env.HOME ?? ".", ".mngboard", "runs"),
+      logDir: path.join(process.env.HOME ?? ".", ".crewpip", "runs"),
     },
   ) {
     super();
@@ -188,7 +188,7 @@ export class Runner extends EventEmitter<RunnerEvents> {
       const started = this.db
         .prepare("SELECT COUNT(*) AS n FROM runs WHERE started_by_session_id = ? AND started_at >= ?")
         .get(o.startedBySessionId, since) as { n: number };
-      const cap = Number(process.env.MNGBOARD_RUNS_PER_HOUR ?? 20);
+      const cap = Number(process.env.CREWPIP_RUNS_PER_HOUR ?? 20);
       if (started.n >= cap) throw new Error(`Diese Session hat in der letzten Stunde schon ${started.n} Läufe gestartet (Obergrenze ${cap}).`);
     }
     const appImpl = RUNNER_APPS[o.app];
@@ -237,7 +237,7 @@ export class Runner extends EventEmitter<RunnerEvents> {
     const logPath = path.join(this.opts.logDir, `${id}.jsonl`);
     this.db.prepare("UPDATE runs SET log_path = ? WHERE id = ?").run(logPath, id);
 
-    // Schreibt der Lauf in einen mngboard-Worktree, braucht ein Commit Stellen im gemeinsamen
+    // Schreibt der Lauf in einen CrewPip-Worktree, braucht ein Commit Stellen im gemeinsamen
     // Git-Verzeichnis, das außerhalb des Worktrees liegt.
     const task = taskId ? this.board.task(taskId) : null;
     const branch = task?.worktree && path.resolve(task.worktree.path) === path.resolve(cwd) ? task.worktree.branch : null;
@@ -247,9 +247,9 @@ export class Runner extends EventEmitter<RunnerEvents> {
     const child = spawn(bin, args, {
       cwd,
       stdio: ["pipe", "pipe", "pipe"],
-      // MNGBOARD_RUN kennzeichnet den Lauf für Hooks; die eigene Session-Kennung des Daemons
+      // CREWPIP_RUN kennzeichnet den Lauf für Hooks; die eigene Session-Kennung des Daemons
       // wird nicht weitergereicht, damit der Agent nicht in fremde Postfächer schreibt.
-      env: { ...process.env, MNGBOARD_RUN: String(id), MNGBOARD_SESSION_NAME: `Lauf #${id}` },
+      env: { ...process.env, CREWPIP_RUN: String(id), CREWPIP_SESSION_NAME: `Lauf #${id}` },
     });
     // Der Auftrag geht je nach Werkzeug über die Argumente oder über stdin; stdin wird in
     // jedem Fall geschlossen, sonst wartet ein Werkzeug wie Codex auf weitere Eingabe.
@@ -278,7 +278,7 @@ export class Runner extends EventEmitter<RunnerEvents> {
       this.opts.log?.(`[run] #${id} Zeit abgelaufen, wird beendet`);
       this.finish(id, "timeout", null, summary, stderr);
       child.kill("SIGKILL");
-    }, this.opts.timeoutMs ?? Number(process.env.MNGBOARD_RUN_TIMEOUT_MS ?? 30 * 60 * 1000));
+    }, this.opts.timeoutMs ?? Number(process.env.CREWPIP_RUN_TIMEOUT_MS ?? 30 * 60 * 1000));
 
     this.live.set(id, { child, timer });
     this.db.prepare("UPDATE runs SET pid = ? WHERE id = ?").run(child.pid ?? null, id);
@@ -312,7 +312,7 @@ export class Runner extends EventEmitter<RunnerEvents> {
   }
 
   /**
-   * Nach einem erfolgreichen schreibenden Lauf pusht mngboard den Branch selbst. Der Agent
+   * Nach einem erfolgreichen schreibenden Lauf pusht CrewPip den Branch selbst. Der Agent
    * darf nicht pushen, siehe WRITE_DENY. Ein roter pre-push-Hook macht den Lauf zum Fehlschlag:
    * das Abnahmekriterium ist ein gepushter Commit mit grünen Hooks, nicht ein beendeter Prozess.
    */
@@ -323,7 +323,7 @@ export class Runner extends EventEmitter<RunnerEvents> {
       this.finish(id, "done", code, summary, stderr);
       return;
     }
-    this.emit("item", id, { kind: "command", text: `mngboard: git push origin ${branch}`, at: new Date().toISOString() });
+    this.emit("item", id, { kind: "command", text: `CrewPip: git push origin ${branch}`, at: new Date().toISOString() });
     const res = await git.pushBranch(cwd, branch);
     this.db
       .prepare("UPDATE runs SET push_log = ? WHERE id = ?")
@@ -377,6 +377,6 @@ export class Runner extends EventEmitter<RunnerEvents> {
   }
 
   stopAll(): void {
-    for (const id of [...this.live.keys()]) this.stop(id);
+    for (const id of this.live.keys()) this.stop(id);
   }
 }

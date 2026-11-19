@@ -11,7 +11,7 @@ import * as git from "../src/git.js";
 
 /** Legt ein echtes Repository mit einem Commit an. */
 function repo(): string {
-  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "mngboard-repo-")));
+  const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "crewpip-repo-")));
   const run = (...args: string[]) => execFileSync("git", ["-C", dir, ...args], { stdio: "ignore" });
   run("init", "-q", "-b", "main");
   run("config", "user.email", "test@example.com");
@@ -35,12 +35,12 @@ test("Projekt wird über die Repository-Wurzel erkannt, auch aus einem Worktree 
   assert.equal(p.root, root);
   assert.equal(p.name, path.basename(root));
 
-  const wt = path.join(root, ".mngboard", "worktrees", "probe");
+  const wt = path.join(root, ".crewpip", "worktrees", "probe");
   await git.addWorktree({ root, dir: wt, branch: "probe" });
   assert.equal(board.resolveProject(wt).id, p.id, "ein Worktree gehört zum Haupt-Repository");
   assert.equal(board.projects().length, 1);
 
-  const kein = fs.mkdtempSync(path.join(os.tmpdir(), "mngboard-nogit-"));
+  const kein = fs.mkdtempSync(path.join(os.tmpdir(), "crewpip-nogit-"));
   assert.equal(board.resolveProject(kein).root, fs.realpathSync(kein), "ohne git dient das Verzeichnis selbst als Projekt");
   assert.equal(board.resolveProject(fs.realpathSync(kein)).id, board.resolveProject(kein).id, "Symlink-Pfad und aufgelöster Pfad meinen dasselbe Projekt");
 });
@@ -89,7 +89,7 @@ test("Worktree: anlegen, Session zuordnen, mit Änderungen nicht entfernen, mit 
 
   const withTree = await board.createWorktree(t.id);
   assert.ok(withTree.worktree, "Worktree ist vermerkt");
-  assert.equal(withTree.worktree!.branch, `mngboard/${t.id}-neue-route-bauen`);
+  assert.equal(withTree.worktree!.branch, `crewpip/${t.id}-neue-route-bauen`);
   assert.ok(fs.existsSync(path.join(withTree.worktree!.path, "README.md")), "Dateien sind ausgecheckt");
   assert.equal(git.currentBranch(withTree.worktree!.path), withTree.worktree!.branch);
   await assert.rejects(() => board.createWorktree(t.id), /hat schon einen Worktree/);
@@ -211,9 +211,9 @@ test("Der Bootstrap-Befehl wird am Projekt gepflegt, nicht aus dem Repository ge
   const { board } = fresh();
   const p = board.resolveProject(root);
   // Eine Datei im Repository darf keine Wirkung haben.
-  fs.mkdirSync(path.join(root, ".mngboard"), { recursive: true });
-  fs.writeFileSync(path.join(root, ".mngboard", "bootstrap"), "echo aus-dem-repo > uebernommen.txt");
-  assert.equal(board.project(p.id)!.bootstrap, null, "mngboard führt nichts aus, was das Repository mitbringt");
+  fs.mkdirSync(path.join(root, ".crewpip"), { recursive: true });
+  fs.writeFileSync(path.join(root, ".crewpip", "bootstrap"), "echo aus-dem-repo > uebernommen.txt");
+  assert.equal(board.project(p.id)!.bootstrap, null, "CrewPip führt nichts aus, was das Repository mitbringt");
 
   assert.equal(board.setBootstrap(p.id, "  echo x  ").bootstrap, "echo x");
   assert.equal(board.setBootstrap(p.id, "   ").bootstrap, null, "leer heißt: keiner");

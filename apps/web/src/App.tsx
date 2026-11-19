@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, CheckCheck, CircleHelp, Folder, LayoutDashboard, ListTodo, MessageSquare, Search, Send, Radio, ChevronRight, Plus } from "lucide-react";
-import { APP_LABELS, ROLE_LABELS, SESSION_ROLES, type AppKind, type Message, type Project, type Run, type RunItem, type Session, type Task, type WsEvent } from "@mngboard/shared";
+import { APP_LABELS, ROLE_LABELS, SESSION_ROLES, type AppKind, type Message, type Project, type Run, type RunItem, type Session, type Task, type WsEvent } from "@crewpip/shared";
 import { LanguageProvider, recipientLabel, useBoardLanguage } from "./language.tsx";
 import { displayError } from "./errors.ts";
 import { api, ConnectionError, wsUrl } from "./api.ts";
 import { Tasks } from "./Tasks.tsx";
 import { Content } from "./Content.tsx";
 
-const NAME_KEY = "mngboard.humanName";
+const NAME_KEY = "crewpip.humanName";
 type View = "overview" | "messages" | "tasks" | "guide";
 const date = (iso: string, locale: string) => new Date(iso).toLocaleString(locale, { dateStyle: "short", timeStyle: "short" });
 const preview = (text: string) => text.replace(/[#*`>]/g, "").replace(/\s+/g, " ").trim();

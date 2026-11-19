@@ -11,17 +11,17 @@ import { readToken } from "./auth.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../../..");
-const hook = path.join(repoRoot, "apps/hook/mngboard-hook.mjs");
+const hook = path.join(repoRoot, "apps/hook/crewpip-hook.mjs");
 const url = baseUrl();
-const token = readToken() ?? "<Token aus ~/.mngboard/token>";
+const token = readToken() ?? "<Token aus ~/.crewpip/token>";
 
 const hookCmd = (app: string, event: string) => `node ${hook} ${app} ${event}`;
 
 export const snippets = {
   claudeMcp: {
-    file: "~/.claude.json (user scope) oder <projekt>/.mcp.json, alternativ: claude mcp add --transport http --header \"x-mngboard-token: <Token>\" mngboard " + `${url}/mcp/claude?app=claude`,
+    file: "~/.claude.json (user scope) oder <projekt>/.mcp.json, alternativ: claude mcp add --transport http --header \"x-crewpip-token: <Token>\" crewpip " + `${url}/mcp/claude?app=claude`,
     content: JSON.stringify(
-      { mcpServers: { mngboard: { type: "http", url: `${url}/mcp/claude?app=claude`, headers: { "x-mngboard-token": token } } } },
+      { mcpServers: { crewpip: { type: "http", url: `${url}/mcp/claude?app=claude`, headers: { "x-crewpip-token": token } } } },
       null,
       2,
     ),
@@ -44,7 +44,7 @@ export const snippets = {
   cursorMcp: {
     file: "~/.cursor/mcp.json",
     content: JSON.stringify(
-      { mcpServers: { mngboard: { url: `${url}/mcp/cursor?app=cursor`, headers: { "x-mngboard-token": token } } } },
+      { mcpServers: { crewpip: { url: `${url}/mcp/cursor?app=cursor`, headers: { "x-crewpip-token": token } } } },
       null,
       2,
     ),
@@ -65,15 +65,15 @@ export const snippets = {
     ),
   },
   codexMcp: {
-    file: "~/.codex/config.toml (anhängen), alternativ: codex mcp add mngboard --url " + `${url}/mcp/codex?app=codex`,
+    file: "~/.codex/config.toml (anhängen), alternativ: codex mcp add crewpip --url " + `${url}/mcp/codex?app=codex`,
     content: [
-      "[mcp_servers.mngboard]",
+      "[mcp_servers.crewpip]",
       `url = "${url}/mcp/codex?app=codex"`,
       "startup_timeout_sec = 10",
       "tool_timeout_sec = 60",
       "",
-      "[mcp_servers.mngboard.http_headers]",
-      `x-mngboard-token = "${token}"`,
+      "[mcp_servers.crewpip.http_headers]",
+      `x-crewpip-token = "${token}"`,
       "",
     ].join("\n"),
   },

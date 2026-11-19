@@ -10,7 +10,7 @@ import {
   TASK_STATUSES,
   projectRootOf,
   sessionLabel,
-} from "@mngboard/shared";
+} from "@crewpip/shared";
 import * as git from "./git.js";
 
 export interface BoardEvents {
@@ -275,8 +275,8 @@ export class Board extends EventEmitter<BoardEvents> {
     const name = `${id}-${git.slug(cur.title, 32)}`;
     const added = await git.addWorktree({
       root: project.root,
-      dir: path.join(project.root, ".mngboard", "worktrees", name),
-      branch: `mngboard/${name}`,
+      dir: path.join(project.root, ".crewpip", "worktrees", name),
+      branch: `crewpip/${name}`,
       base: opts.base,
     });
     this.db

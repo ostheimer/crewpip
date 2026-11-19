@@ -7,8 +7,8 @@ import path from "node:path";
 import { appliedMigrations, backupDb, migrate, openDb, pendingMigrations, schemaVersion } from "../src/db.js";
 import { MIGRATIONS } from "../src/migrations.js";
 
-function tmpDb(name = "mngboard.db"): string {
-  return path.join(fs.mkdtempSync(path.join(os.tmpdir(), "mngboard-db-")), name);
+function tmpDb(name = "crewpip.db"): string {
+  return path.join(fs.mkdtempSync(path.join(os.tmpdir(), "crewpip-db-")), name);
 }
 
 const tables = (db: DatabaseSync) =>

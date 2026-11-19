@@ -5,4 +5,4 @@ dist/
 data/
 config/generated/
 .env
-.mngboard/
+.crewpip/
