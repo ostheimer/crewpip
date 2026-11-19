@@ -1,6 +1,9 @@
 import { Fragment } from "react";
 import { ArrowRight } from "lucide-react";
+import type { ConnectionState } from "@crewpip/shared";
 import { useBoardLanguage } from "./language.tsx";
+
+const STATES: ConnectionState[] = ["connected", "no-hook", "stale", "ended"];
 
 /** `code` in Erklärtexten als <code> ausgeben, sonst reiner Text. */
 export function Rich({ text }: { text: string }) {
@@ -41,8 +44,8 @@ export function Guide({ onWrite, onTasks }: { onWrite: (target: string) => void;
       <dl className="guide-list">{g.addresses.map(([address, text]) => <div key={address}><dt><code>{address}</code></dt><dd><Rich text={text} /></dd></div>)}</dl>
     </section>
     <section className="guide-section"><h2>{g.statesTitle}</h2><p><Rich text={g.statesIntro} /></p>
-      <dl className="guide-list">{g.states.map(([state, text]) => <div key={state}><dt>{state}</dt><dd><Rich text={text} /></dd></div>)}</dl>
-      <h3>{g.fixTitle}</h3><ol>{g.fix.map(step => <li key={step}><Rich text={step} /></li>)}</ol>
+      <dl className="guide-list">{STATES.map(state => <div key={state}><dt>{ui.connectionState[state]}</dt><dd><Rich text={g.states[state]} /></dd></div>)}</dl>
+      <h3>{g.fixTitle(ui.connectionState["no-hook"])}</h3><ol>{g.fix(ui.connectionState.connected).map(step => <li key={step}><Rich text={step} /></li>)}</ol>
     </section>
     <section className="guide-section"><h2>{g.limitsTitle}</h2>
       <dl className="guide-list">{g.limits.map(([title, text]) => <div key={title}><dt>{title}</dt><dd><Rich text={text} /></dd></div>)}</dl>

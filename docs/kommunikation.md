@@ -27,7 +27,7 @@ Nachrichten austauschen, zeigen die Zustellnachweise unter jeder Nachricht.
   legt er Post ab, mit `read_inbox` holt er sie selbst ab, mit `wait_for_message` wartet er auf
   neue Post, mit `list_sessions` sieht er die Adressen der anderen Chats
   (`apps/daemon/src/mcp.ts`).
-- **Hooks.** Die App startet bei Sitzungsstart, Prompt, Turn-Ende und Sitzungsende das Skript
+- **Hooks.** Die App startet bei Sitzungsstart, Prompt (nicht bei Cursor), Turn-Ende und Sitzungsende das Skript
   `apps/hook/crewpip-hook.mjs`. Es meldet den Chat an (`/hooks/<app>/<ereignis>` in
   `apps/daemon/src/http.ts`) und bringt wartende Post in den Chat. Nur der Hook stellt Post von
   selbst zu.
@@ -74,8 +74,8 @@ genaue Regel steht in [verbindung.md](verbindung.md).
 
 | Anzeige | Bedeutung |
 |---|---|
-| Post kommt an | Mit CrewPip verbunden: Der Hook hat sich gemeldet und das Programm läuft. Post kommt beim nächsten Turn an, auch wenn der Chat gerade ruht. |
-| Ohne Hook | CrewPip kennt den Chat, aber sein Hook hat sich nie gemeldet. Post kommt nicht von selbst an, nur mit `read_inbox` oder `wait_for_message`. |
+| Verbunden | Mit CrewPip verbunden: Der Hook hat sich gemeldet und das Programm läuft. Post kommt beim nächsten Turn an, auch wenn der Chat gerade ruht. |
+| Ohne Hook | CrewPip kennt den Chat, aber sein Hook hat sich noch nie gemeldet. Ob Post von selbst ankommt, ist offen; sicher abholen kann der Chat sie mit `read_inbox` oder `wait_for_message`. |
 | Veraltet | Das Programm des Chats läuft nicht mehr. Der Eintrag ist liegen geblieben. |
 | Beendet | Ausgetragen. Erscheint nicht in der Übersicht. |
 
@@ -84,7 +84,8 @@ genaue Regel steht in [verbindung.md](verbindung.md).
 1. Im CrewPip-Ordner `pnpm snippets --write` ausführen.
 2. Die Hook-Einträge für die App aus `config/generated/` übernehmen. Bei Codex danach `/hooks`
    ausführen und die vier CrewPip-Hooks freigeben.
-3. Den Chat neu starten und einen Prompt eingeben. Danach steht er auf „Post kommt an“.
+3. Den Chat neu starten und einen Prompt eingeben (Cursor: einen neuen Chat beginnen). Danach
+   steht er auf „Verbunden“.
 
 ## Grenzen
 
@@ -94,7 +95,7 @@ genaue Regel steht in [verbindung.md](verbindung.md).
   heißt: im Empfänger-Chat angekommen. Erledigt ist damit noch nichts.
 - **Schleifensperre.** Am Turn-Ende lässt CrewPip höchstens `CREWPIP_MAX_STOP_CONTINUATIONS` (Standard 10)
   Fortsetzungen je Chat zu, bis wieder ein Mensch einen Prompt eingibt. Übrige Post kommt dann
-  beim nächsten Prompt. Cursor begrenzt den stop-Hook zusätzlich mit `loop_limit`.
+  beim nächsten Prompt, bei Cursor beim nächsten Sitzungsstart oder Turn-Ende. Cursor begrenzt den stop-Hook zusätzlich mit `loop_limit`.
 - **Codex-Threads teilen sich einen Prozess.** Alle Threads der ChatGPT-App laufen über einen
   `codex`-Prozess. Arbeiten zwei im selben Ordner, unterscheidet CrewPip sie über einen
   Sitzungsschlüssel, den nur der Hook des jeweiligen Threads erfährt. Ein Thread, der ohne

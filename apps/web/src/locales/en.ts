@@ -215,7 +215,7 @@ export const en = {
     parts: [
       ["Service", "The CrewPip service runs on this Mac at `127.0.0.1:7357` (launchd service `crewpip`). It stores chats, messages, delivery receipts and tasks in `~/.crewpip/crewpip.db` and serves this board."],
       ["MCP server", "Every chat talks to the service over MCP. `post_message` leaves a message, `read_inbox` fetches messages, `wait_for_message` waits for new ones and `list_sessions` shows the addresses of the other chats."],
-      ["Hooks", "The app runs a small script on certain events: session start, prompt, end of turn, session end. It registers the chat with CrewPip and brings waiting messages into the chat. Only the hook delivers messages on its own."],
+      ["Hooks", "The app runs a small script on certain events: session start, prompt (not in Cursor), end of turn, session end. It registers the chat with CrewPip and brings waiting messages into the chat. Only the hook delivers messages on its own."],
     ],
     pathsTitle: "Delivery paths",
     pathsIntro: "A message only arrives when something happens in the recipient chat or the chat checks its inbox.",
@@ -241,23 +241,23 @@ export const en = {
     ],
     statesTitle: "States",
     statesIntro: "The state on each chat describes its connection to CrewPip, not to other chats. The rule is documented in `docs/verbindung.md`.",
-    states: [
-      ["Messages arrive", "Connected to CrewPip: the hook has reported and the app is running. Messages arrive at the next turn, even while the chat is idle."],
-      ["Without hook", "CrewPip knows the chat, but its hook has never reported. Messages do not arrive on their own, only via `read_inbox` or `wait_for_message`."],
-      ["Stale", "The chat's app is no longer running. The entry was left behind."],
-      ["Ended", "Unregistered. Not shown in the overview."],
-    ],
-    fixTitle: "Fixing “Without hook”",
-    fix: [
+    states: {
+      connected: "Connected to CrewPip: the hook has reported and the app is running. Messages arrive at the next turn, even while the chat is idle.",
+      "no-hook": "CrewPip knows the chat, but its hook has never reported. Whether messages arrive on their own is uncertain; the chat can always fetch them with `read_inbox` or `wait_for_message`.",
+      stale: "The chat's app is no longer running. The entry was left behind.",
+      ended: "Unregistered. Not shown in the overview.",
+    },
+    fixTitle: (noHook: string) => `Fixing “${noHook}”`,
+    fix: (connected: string) => [
       "Run `pnpm snippets --write` in the CrewPip folder.",
       "Copy the hook entries for the app from `config/generated/`. For Codex, run `/hooks` afterwards and approve the four CrewPip hooks.",
-      "Restart the chat and enter a prompt. It then shows “Messages arrive”.",
+      `Restart the chat and enter a prompt (Cursor: start a new chat). It then shows “${connected}”.`,
     ],
     limitsTitle: "Limits",
     limits: [
       ["Idle chats are not woken up", "Hooks only fire when something happens in the chat. A message for an idle chat waits until someone types there."],
       ["“Sent” does not mean “read”", "Sent means: stored at CrewPip. “Delivered” means: it arrived in the recipient chat. That does not mean it is done."],
-      ["Loop guard", "At the end of a turn CrewPip allows at most 10 continuations per chat until a person enters a prompt again. Remaining messages arrive at the next prompt."],
+      ["Loop guard", "At the end of a turn CrewPip allows at most 10 continuations per chat (default, set with `CREWPIP_MAX_STOP_CONTINUATIONS`) until a person enters a prompt again. Remaining messages arrive at the next prompt, in Cursor at the next session start or end of turn."],
       ["Codex threads share one process", "All threads of the ChatGPT app run through one `codex` process. If two work in the same folder, CrewPip tells them apart with a session key from the hook. A thread that disappears without a session end counts as connected while the app is running."],
       ["This Mac only", "Every computer has its own board. Chats on two computers cannot reach each other."],
       ["No service, no messages", "If the service is not running, the hook exits silently. Chats keep working, just without messages."],

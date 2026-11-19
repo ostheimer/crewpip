@@ -50,7 +50,10 @@ for (const [language, nav, headings] of [
       for (const h of headings) assert.match(html, new RegExp(`<h2[^>]*>${h}</h2>`), `Abschnitt ${h} fehlt`);
       for (const a of ADDRESSES) assert.ok(html.includes(`<code>${a}`), `Adresse ${a} fehlt`);
       assert.match(html, /class="flow-diagram" role="img" aria-label="[^"]*post_message/, "Grafik des Nachrichtenflusses fehlt");
-      assert.ok(html.includes(String(MAX_STOP)), "Schleifensperre nennt nicht den Wert aus config.ts");
+      assert.ok(html.includes(`${language === "de" ? "höchstens" : "at most"} ${MAX_STOP} `), "Schleifensperre nennt nicht den Wert aus config.ts");
+      // Zustandsnamen wie in der Übersicht, damit man sie dort wiederfindet.
+      const { [language]: copy } = await server.ssrLoadModule(`/src/locales/${language}.ts`);
+      for (const label of Object.values(copy.connectionState)) assert.ok(html.includes(`<dt>${label}</dt>`), `Zustand ${label} fehlt oder heißt anders als in der Übersicht`);
       assert.ok(html.includes(`${MAX_WAIT} s`), "wait_for_message nennt nicht die Obergrenze aus config.ts");
       for (const tool of ["post_message", "read_inbox", "wait_for_message", "UserPromptSubmit"]) assert.ok(html.includes(tool), `${tool} fehlt`);
     });
@@ -71,5 +74,9 @@ for (const [file, readme, headings] of [
     assert.match(doc, new RegExp(`CREWPIP_MAX_STOP_CONTINUATIONS[^\\n]*${MAX_STOP}`));
     assert.match(doc, new RegExp(`${MAX_WAIT} s`));
     assert.ok(doc.includes("verbindung.md"), "Verweis auf die Verbindungsregel fehlt");
+    const locale = read(`apps/web/src/locales/${file.endsWith("kommunikation.md") ? "de" : "en"}.ts`);
+    const labels = [...locale.match(/connectionState: \{([^}]*)\}/)[1].matchAll(/: "([^"]+)"/g)].map(m => m[1]);
+    assert.equal(labels.length, 4);
+    for (const label of labels) assert.ok(doc.includes(`| ${label} |`), `Zustand ${label} fehlt oder heißt anders als im Board`);
   });
 }

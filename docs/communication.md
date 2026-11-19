@@ -26,7 +26,7 @@ message show which chats actually exchange messages.
 - **MCP server.** Every chat talks to the service over MCP (`/mcp/<app>`). `post_message` leaves
   a message, `read_inbox` fetches messages, `wait_for_message` waits for new ones and
   `list_sessions` shows the addresses of the other chats (`apps/daemon/src/mcp.ts`).
-- **Hooks.** On session start, prompt, end of turn and session end the app runs
+- **Hooks.** On session start, prompt (not in Cursor), end of turn and session end the app runs
   `apps/hook/crewpip-hook.mjs`. It registers the chat (`/hooks/<app>/<event>` in
   `apps/daemon/src/http.ts`) and brings waiting messages into the chat. Only the hook delivers
   messages on its own.
@@ -73,8 +73,8 @@ is documented in [verbindung.md](verbindung.md) (German).
 
 | Label | Meaning |
 |---|---|
-| Messages arrive | Connected to CrewPip: the hook has reported and the app is running. Messages arrive at the next turn, even while the chat is idle. |
-| Without hook | CrewPip knows the chat, but its hook has never reported. Messages do not arrive on their own, only via `read_inbox` or `wait_for_message`. |
+| Connected | Connected to CrewPip: the hook has reported and the app is running. Messages arrive at the next turn, even while the chat is idle. |
+| Without hook | CrewPip knows the chat, but its hook has never reported. Whether messages arrive on their own is uncertain; the chat can always fetch them with `read_inbox` or `wait_for_message`. |
 | Stale | The chat's app is no longer running. The entry was left behind. |
 | Ended | Unregistered. Not shown in the overview. |
 
@@ -83,7 +83,7 @@ Fixing “Without hook”:
 1. Run `pnpm snippets --write` in the CrewPip folder.
 2. Copy the hook entries for the app from `config/generated/`. For Codex, run `/hooks`
    afterwards and approve the four CrewPip hooks.
-3. Restart the chat and enter a prompt. It then shows “Messages arrive”.
+3. Restart the chat and enter a prompt (Cursor: start a new chat). It then shows “Connected”.
 
 ## Limits
 
@@ -93,7 +93,7 @@ Fixing “Without hook”:
   in the recipient chat. That does not mean it is done.
 - **Loop guard.** At the end of a turn CrewPip allows at most `CREWPIP_MAX_STOP_CONTINUATIONS` (default 10)
   continuations per chat until a person enters a prompt again. Remaining messages arrive at
-  the next prompt. Cursor also limits its stop hook with `loop_limit`.
+  the next prompt, in Cursor at the next session start or end of turn. Cursor also limits its stop hook with `loop_limit`.
 - **Codex threads share one process.** All threads of the ChatGPT app run through one `codex`
   process. If two work in the same folder, CrewPip tells them apart with a session key that only
   the hook of that thread receives. A thread that disappears without a session end counts as

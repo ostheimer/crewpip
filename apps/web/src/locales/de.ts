@@ -182,7 +182,7 @@ export const de = {
     parts: [
       ["Dienst", "Der CrewPip-Dienst läuft auf diesem Mac unter `127.0.0.1:7357` (launchd-Dienst `crewpip`). Er speichert Chats, Nachrichten, Zustellnachweise und Aufgaben in `~/.crewpip/crewpip.db` und liefert dieses Board aus."],
       ["MCP-Server", "Jeder Chat spricht über MCP mit dem Dienst. Mit `post_message` legt er Post ab, mit `read_inbox` holt er sie selbst ab, mit `wait_for_message` wartet er auf neue Post, mit `list_sessions` sieht er die Adressen der anderen Chats."],
-      ["Hooks", "Die App startet bei bestimmten Ereignissen ein kleines Skript: Sitzungsstart, Prompt, Turn-Ende, Sitzungsende. Es meldet den Chat bei CrewPip an und bringt wartende Post in den Chat. Nur der Hook stellt Post von selbst zu."],
+      ["Hooks", "Die App startet bei bestimmten Ereignissen ein kleines Skript: Sitzungsstart, Prompt (nicht bei Cursor), Turn-Ende, Sitzungsende. Es meldet den Chat bei CrewPip an und bringt wartende Post in den Chat. Nur der Hook stellt Post von selbst zu."],
     ],
     pathsTitle: "Zustellwege",
     pathsIntro: "Post kommt nur an, wenn im Empfänger-Chat etwas passiert oder er selbst nachsieht.",
@@ -208,23 +208,24 @@ export const de = {
     ],
     statesTitle: "Zustände",
     statesIntro: "Der Zustand an jedem Chat beschreibt seine Verbindung zu CrewPip, nicht zu anderen Chats. Die Regel steht in `docs/verbindung.md`.",
-    states: [
-      ["Post kommt an", "Mit CrewPip verbunden: Der Hook hat sich gemeldet und das Programm läuft. Post kommt beim nächsten Turn an, auch wenn der Chat gerade ruht."],
-      ["Ohne Hook", "CrewPip kennt den Chat, aber sein Hook hat sich nie gemeldet. Post kommt nicht von selbst an, nur mit `read_inbox` oder `wait_for_message`."],
-      ["Veraltet", "Das Programm des Chats läuft nicht mehr. Der Eintrag ist liegen geblieben."],
-      ["Beendet", "Ausgetragen. Erscheint nicht in der Übersicht."],
-    ],
-    fixTitle: "„Ohne Hook“ beheben",
-    fix: [
+    /** Die Namen der Zustände kommen aus connectionState, damit Seite und Übersicht gleich heißen. */
+    states: {
+      connected: "Mit CrewPip verbunden: Der Hook hat sich gemeldet und das Programm läuft. Post kommt beim nächsten Turn an, auch wenn der Chat gerade ruht.",
+      "no-hook": "CrewPip kennt den Chat, aber sein Hook hat sich noch nie gemeldet. Ob Post von selbst ankommt, ist offen; sicher abholen kann der Chat sie mit `read_inbox` oder `wait_for_message`.",
+      stale: "Das Programm des Chats läuft nicht mehr. Der Eintrag ist liegen geblieben.",
+      ended: "Ausgetragen. Erscheint nicht in der Übersicht.",
+    },
+    fixTitle: (noHook: string) => `„${noHook}“ beheben`,
+    fix: (connected: string) => [
       "Im CrewPip-Ordner `pnpm snippets --write` ausführen.",
       "Die Hook-Einträge für die App aus `config/generated/` übernehmen. Bei Codex danach `/hooks` ausführen und die vier CrewPip-Hooks freigeben.",
-      "Den Chat neu starten und einen Prompt eingeben. Danach steht er auf „Post kommt an“.",
+      `Den Chat neu starten und einen Prompt eingeben (Cursor: einen neuen Chat beginnen). Danach steht er auf „${connected}“.`,
     ],
     limitsTitle: "Grenzen",
     limits: [
       ["Ruhende Chats werden nicht geweckt", "Hooks feuern nur, wenn im Chat etwas passiert. Post für einen ruhenden Chat wartet, bis dort jemand etwas eingibt."],
       ["„Gesendet“ heißt nicht „gelesen“", "Gesendet heißt: bei CrewPip abgelegt. „Zugestellt“ heißt: im Empfänger-Chat angekommen. Erledigt ist damit noch nichts."],
-      ["Schleifensperre", "Am Turn-Ende lässt CrewPip höchstens 10 Fortsetzungen je Chat zu, bis wieder ein Mensch einen Prompt eingibt. Übrige Post kommt dann beim nächsten Prompt."],
+      ["Schleifensperre", "Am Turn-Ende lässt CrewPip höchstens 10 Fortsetzungen je Chat zu (Standard, einstellbar mit `CREWPIP_MAX_STOP_CONTINUATIONS`), bis wieder ein Mensch einen Prompt eingibt. Übrige Post kommt dann beim nächsten Prompt, bei Cursor beim nächsten Sitzungsstart oder Turn-Ende."],
       ["Codex-Threads teilen sich einen Prozess", "Alle Threads der ChatGPT-App laufen über einen `codex`-Prozess. Arbeiten zwei im selben Ordner, unterscheidet CrewPip sie über einen Sitzungsschlüssel aus dem Hook. Ein Thread, der ohne Sitzungsende verschwindet, gilt als verbunden, solange die App läuft."],
       ["Nur dieser Mac", "Jeder Rechner hat sein eigenes Board. Chats auf zwei Rechnern erreichen einander nicht."],
       ["Ohne Dienst keine Post", "Läuft der Dienst nicht, beendet sich der Hook still. Die Chats arbeiten normal weiter, nur ohne Nachrichten."],
