@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Seitenleiste bei niedrigem Fenster (Issue #14): Projektliste zeigt bei 800 x 600 mindestens sechs Zeilen, die Leiste scrollt als Ganzes, Sprach-/Darstellungsauswahl und Hilfe bleiben erreichbar. Neuer Browser-Test `apps/daemon/test/browser/sidebar-layout.ts`.
+
 - Dashboard im Retro-Terminal-Stil (Issue #12) statt Steampunk: grüne Monochrom-Schrift auf dunklem Grund, Systemschrift Monospace, Bernstein für Warnungen, Auswahl System/Dunkel/Hell (Standard Dunkel). Fließtext mindestens 15 px, Glühen nur auf Rahmen und Überschriften, keine Animationen; Zustände zusätzlich über Symbole. Steampunk-Schriften entfernt. Keine Funktionsänderung.
 - (abgelöst durch Issue #12) Dashboard im dezenten Retro-Steampunk-Design (Issue #9): zentrale Farb- und Schrift-Tokens in `apps/web/src/theme.css` (hell und dunkel, WCAG AA per Test geprüft), Überschriftschrift Alegreya SC (SIL OFL, lokal unter `apps/web/public/fonts`), Ornamente nur als CSS/SVG. Verbindungsstatus bleibt zusätzlich über Form, Rahmen und Text erkennbar. Keine Funktionsänderung.
 - Umbenennung von mngboard in CrewPip. `pnpm service:migrate` sichert und übernimmt bestehende Installationen unter der neuen Dienstkennung.
