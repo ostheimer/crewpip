@@ -16,7 +16,7 @@
     "db:status": "tsx src/db-cli.ts status",
     "db:migrate": "tsx src/db-cli.ts migrate",
     "db:backup": "tsx src/db-cli.ts backup",
-    "test:board": "pnpm --filter @crewpip/web build && tsx --test test/browser/board-language.ts"
+    "test:board": "pnpm --filter @crewpip/web build && tsx --test test/browser/*.ts"
   },
   "dependencies": {
     "@crewpip/shared": "workspace:*",

@@ -14,6 +14,18 @@ export type HookEvent = (typeof HOOK_EVENTS)[number];
 
 export type SessionStatus = "idle" | "working" | "ended";
 
+/**
+ * Ist ein Chat jetzt tatsächlich mit CrewPip verbunden? Regel in docs/verbindung.md:
+ * - "connected": nicht beendet, der Hook hat sich gemeldet und der Agent-Prozess lebt.
+ *   Ruhe (idle, alter letzter Kontakt) ändert daran nichts.
+ * - "no-hook": eingetragen (Registry oder MCP-Aufruf), aber nie über den Hook gemeldet;
+ *   Post erreicht ihn nicht von selbst.
+ * - "stale": der Agent-Prozess läuft nicht mehr, der Eintrag ist liegen geblieben.
+ * - "ended": ausgetragen.
+ */
+export const CONNECTION_STATES = ["connected", "no-hook", "stale", "ended"] as const;
+export type ConnectionState = (typeof CONNECTION_STATES)[number];
+
 export const SESSION_ROLES = ["director", "pm", "worker"] as const;
 /** Rolle laut docs/rollen.md. null heißt: keine Rolle vergeben. */
 export type SessionRole = (typeof SESSION_ROLES)[number];
@@ -148,7 +160,10 @@ export interface Session {
   /** "Claude · example-project / api-worker" */
   label: string;
   status: SessionStatus;
+  /** Verbindung zu CrewPip, siehe ConnectionState */
+  connection: ConnectionState;
   startedAt: string;
+  /** Letzter Kontakt über Hook oder MCP */
   lastSeenAt: string;
   endedAt: string | null;
   /** Nachrichten, die diese Session noch nicht gesehen hat */

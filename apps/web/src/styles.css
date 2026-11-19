@@ -343,3 +343,39 @@ h2 { font-size:15px; line-height:1.4; margin:0; font-weight:650; }
 @media (max-width: 700px) {
   .sidebar-bottom { display: flex; align-items: center; gap: 10px; }
 }
+
+/* Verbundene Chats (Issue #8). Klassen conn-* tragen nur Layout und Zustandsfarben. */
+.connections { margin: 28px 0; }
+.connections .section-heading p { margin: 4px 0 0; color: var(--muted); font-size: 13px; max-width: 760px; }
+.conn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 14px; margin-top: 12px; }
+.conn-project { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+.conn-project.conn-none { border-color: var(--danger); }
+.conn-project header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.conn-project h3 { margin: 0; font-size: 15px; overflow-wrap: anywhere; }
+.conn-count { font-size: 12px; color: var(--muted); }
+.conn-none .conn-count { color: var(--danger); font-weight: 600; }
+.conn-roles { display: flex; gap: 6px 18px; flex-wrap: wrap; margin: 8px 0 10px; font-size: 12px; }
+.conn-role { margin: 0; color: var(--muted); }
+.conn-role strong { color: var(--text); font-weight: 500; }
+.conn-role.missing strong { color: var(--danger); }
+.conn-apps { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.conn-app h4 { margin: 0 0 6px; font-size: 12px; }
+.conn-app ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.conn-chat { border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; background: var(--bg); min-width: 0; }
+.conn-chat.conn-stale, .conn-chat.conn-no-hook { opacity: .85; border-style: dashed; }
+.conn-chat-head { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.conn-chat-head strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.conn-chat-meta { display: flex; gap: 4px 10px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.conn-worktree { overflow-wrap: anywhere; }
+.conn-empty { margin: 0; font-size: 12px; color: var(--muted); font-style: italic; }
+.conn-state { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; }
+.conn-state i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
+.conn-state.conn-connected { color: #1f7a4d; }
+.conn-state.conn-no-hook { color: #a15c00; }
+.conn-state.conn-stale, .conn-state.conn-ended { color: var(--danger); }
+@media (prefers-color-scheme: dark) {
+  .conn-state.conn-connected { color: #7fd6a8; }
+  .conn-state.conn-no-hook { color: #f0b768; }
+}
+.conn-without { font-size: 12px; color: var(--muted); margin: 10px 0 0; }
+.conn-without span { color: var(--danger); font-weight: 600; }

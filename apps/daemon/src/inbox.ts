@@ -8,6 +8,7 @@ import {
   type DeliveryMethod,
   type Message,
   type Party,
+  type ConnectionState,
   type Session,
   type SessionStatus,
   type SessionRole,
@@ -114,6 +115,28 @@ function pidAlive(pid: number): boolean {
   }
 }
 
+/**
+ * Verbindungsregel (docs/verbindung.md). Der Hook ist das einzige, was einem Chat Post von
+ * selbst zustellt; eine gespeicherte Prozesskette gibt es nur, wenn er sich gemeldet hat.
+ * Lebt der Prozess, gilt der Chat als verbunden, gleich wie lange er schon ruht: Claude
+ * trägt beendete Chats über die Registry aus, Codex über SessionEnd, und Codex-Threads
+ * teilen sich einen Prozess, sodass ein Zeitfenster offene, ruhende Threads als getrennt
+ * zeigen würde.
+ */
+export function connectionOf(
+  r: Pick<SessionRow, "id" | "pid" | "proc_chain" | "ended_at">,
+  alive: (pid: number) => boolean = pidAlive,
+): ConnectionState {
+  if (r.ended_at) return "ended";
+  if (r.id.startsWith(PLACEHOLDER_PREFIX)) return "no-hook";
+  const chain = chainOf(r);
+  // Claude: die PID aus der Registry ist maßgeblich; sonst der Agent über dem Hook.
+  const pid = r.pid ?? chain[0]?.pid ?? null;
+  if (pid !== null && !alive(pid)) return "stale";
+  if (!chain.length) return "no-hook";
+  return "connected";
+}
+
 function timeLabel(iso: string): string {
   const d = new Date(iso);
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -167,6 +190,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
       name: r.name,
       label: sessionLabel(r.app, r.project, r.name, r.worktree),
       status: r.ended_at ? "ended" : r.status,
+      connection: connectionOf(r),
       startedAt: r.started_at,
       lastSeenAt: r.last_seen_at,
       endedAt: r.ended_at,

@@ -6,6 +6,7 @@ import { displayError } from "./errors.ts";
 import { api, ConnectionError, wsUrl } from "./api.ts";
 import { Tasks } from "./Tasks.tsx";
 import { Content } from "./Content.tsx";
+import { Connections } from "./Connections.tsx";
 
 const NAME_KEY = "crewpip.humanName";
 type View = "overview" | "messages" | "tasks" | "guide";
@@ -91,8 +92,13 @@ function Board() {
         if (e.type === "delivery") setMessages(m => m.map(x => x.id !== e.messageId || x.deliveries.some(d => d.sessionId === e.delivery.sessionId) ? x : { ...x, deliveries: [...x.deliveries, e.delivery], pending: x.pending.filter(p => p !== e.delivery.sessionLabel) }));
       };
     };
+    // Ob ein Chat-Programm noch läuft, meldet niemand von sich aus. Deshalb die Sitzungen
+    // regelmäßig neu holen, damit "verbunden" nicht stehen bleibt, wenn eine App beendet wurde.
+    const poll = setInterval(() => {
+      void api("/api/sessions").then(res => res.ok ? res.json() : null).then(s => { if (s && !closed) setSessions(s); }).catch(() => {});
+    }, 30000);
     void refresh(); connect();
-    return () => { closed = true; clearTimeout(retry); ws?.close(); };
+    return () => { closed = true; clearTimeout(retry); clearInterval(poll); ws?.close(); };
   }, []);
   // CLI sign-in probes can take seconds. Do not block the overview on them.
   useEffect(() => {
@@ -177,6 +183,7 @@ function Board() {
             <button className="stat attention" onClick={() => setView("tasks")}><span><CheckCheck size={18} />{ui.readyForReview}</span><strong>{review.length}</strong><small>{ui.reviewResults} <ArrowRight size={15} /></small></button>
             <div className="stat"><span><Radio size={18} />{ui.startedAgents}</span><strong>{activeRuns.length}</strong><small>{activeRuns.length ? ui.runningHere : ui.noRunningAgent}</small></div>
           </div>
+          <Connections sessions={sessions} projects={visibleProjects} projectId={projectId} />
           <section className="orientation"><div className="orientation-icon"><Send size={22} /></div><div><h2>{ui.setDirection}</h2><p>{ui.directionIntro}</p><span>{ui.deliveryTiming}</span></div><button className="secondary" onClick={() => setView("guide")}>{ui.howItWorks} <ArrowRight size={15} /></button></section>
           {!directors.length && <div className="error-banner">{ui.noDirector}</div>}
           {!sessions.length && <SetupLinks />}
@@ -193,7 +200,7 @@ function Board() {
           <article><span className="step-number">2</span><h2>{ui.recordWork}</h2><p>{ui.taskGuide}</p><button className="secondary" onClick={() => setView("tasks")}>{ui.planTask} <ArrowRight size={16} /></button></article>
           <article><span className="step-number">3</span><h2>{ui.reviewResults}</h2><p>{ui.reviewGuide}</p><button className="secondary" onClick={() => setView("tasks")}>{ui.viewTasks} <ArrowRight size={16} /></button></article>
         </div><section className="help-panel"><h2>{ui.behindScenes}</h2><p>{ui.localGuide}</p><p>{ui.deliveryGuide}</p><p>{ui.worktreeGuide}</p></section></>}
-        {selected && <details className="session-settings"><summary>{ui.manageChats(selected.name, projectSessions.length)}</summary><p>{ui.roleGuide}</p>{projectSessions.map(s => <div className="session-setting" key={s.id}><div><strong>{s.name}</strong><small>{APP_LABELS[s.app]} {ui.lastSeen} {date(s.lastSeenAt, locale)}</small></div><select aria-label={ui.roleFor(s.name)} value={s.role ?? ""} onChange={e => void editSession(s, { role: e.target.value || null })}><option value="">{ui.noRole}</option>{SESSION_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}</select><button className="secondary" onClick={() => { const name = prompt(ui.chatName, s.name); if (name?.trim()) void editSession(s, { name: name.trim() }); }}>{ui.rename}</button><button className="text-button" onClick={() => void forget(s)}>{ui.unregister}</button></div>)}</details>}
+        {selected && <details className="session-settings"><summary>{ui.manageChats(selected.name, projectSessions.length)}</summary><p>{ui.roleGuide}</p>{projectSessions.map(s => <div className="session-setting" key={s.id}><div><strong>{s.name}</strong><small>{APP_LABELS[s.app]} · {ui.connectionState[s.connection]} {ui.lastSeen} {date(s.lastSeenAt, locale)}</small></div><select aria-label={ui.roleFor(s.name)} value={s.role ?? ""} onChange={e => void editSession(s, { role: e.target.value || null })}><option value="">{ui.noRole}</option>{SESSION_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}</select><button className="secondary" onClick={() => { const name = prompt(ui.chatName, s.name); if (name?.trim()) void editSession(s, { name: name.trim() }); }}>{ui.rename}</button><button className="text-button" onClick={() => void forget(s)}>{ui.unregister}</button></div>)}</details>}
         </>}
       </div>
       {compose && <section className="composer" aria-label={ui.compose}><form onSubmit={e => { e.preventDefault(); void send(); }}><div className="composer-heading"><h2>{ui.compose}</h2><button className="text-button" type="button" onClick={() => setCompose(false)}>{ui.closeDraft}</button></div><div className="composer-fields"><label>{ui.from}<input placeholder={ui.human} value={from} onChange={e => setFrom(e.target.value)} /></label><label>{ui.to}<select value={to} onChange={e => setTo(e.target.value)}><option value="director">{ui.directorOption}</option>{!(["director", "all"].includes(to) || projects.some(p => to === `pm:${p.name}`) || sessions.some(s => to === `session:${s.id}`)) && <option value={to}>{to}</option>}<optgroup label={ui.projectManagers}>{projects.map(p => <option key={p.id} value={`pm:${p.name}`}>PM {p.name}</option>)}</optgroup><optgroup label={ui.singleChat}>{sessions.map(s => <option key={s.id} value={`session:${s.id}`}>{s.label}</option>)}</optgroup><option value="all">{ui.broadcast}</option></select></label></div><textarea ref={input} aria-label={ui.message} rows={3} value={text} onChange={e => setText(e.target.value)} placeholder={ui.composerPlaceholder} onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void send(); } }} /><div className="composer-footer"><small>{roleWaiting ? ui.roleUnavailable : to === "all" ? ui.broadcastHint : ui.sendHint}</small><button className="primary" disabled={sending || !text.trim()} type="submit"><Send size={16} />{sending ? ui.saving : ui.sendMessage}</button></div></form></section>}
