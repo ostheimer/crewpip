@@ -40,6 +40,13 @@ before(async () => {
   inbox.post({ sessionId: "cx" }, "pm:demo-alpha", "geheimer Befundtext");
   inbox.post({ sessionId: "cx" }, "pm:demo-alpha", "zweiter Befund");
   inbox.take("pm", "hook-prompt");
+  // Antwort zurück (Hin- und Rückweg) und ein inzwischen beendeter Chat mit Weg zum PM.
+  inbox.post({ sessionId: "pm" }, "session:cx", "Antwort");
+  inbox.take("cx", "hook-stop");
+  inbox.upsertSession({ id: "gone", app: "codex", cwd: "/nirgends/demo-alpha", name: "Fertiger Thread" });
+  inbox.post({ sessionId: "gone" }, "pm:demo-alpha", "erledigt");
+  inbox.take("pm", "hook-prompt");
+  inbox.endSession("gone");
   inbox.post({ sessionId: "pm" }, "director", "Stand");
   inbox.take("dir", "mcp-read");
   daemon = createDaemon(inbox, board, runner, {
@@ -53,6 +60,8 @@ after(async () => { await browser?.close(); await daemon?.close(); });
 
 test("Übersicht: Verbindung zu CrewPip, Anbieter erkennbar, Zustände erklärt, Nachrichtenwege", async () => {
   const page = await browser.newPage({ locale: "de-AT", viewport: { width: 1440, height: 1600 } });
+  const consoleErrors: string[] = [];
+  page.on("console", m => { if (m.type() === "error") consoleErrors.push(m.text()); });
   try {
     await page.goto(url);
     const panel = page.getByRole("region", { name: "Chats an CrewPip" });
@@ -71,13 +80,18 @@ test("Übersicht: Verbindung zu CrewPip, Anbieter erkennbar, Zustände erklärt,
     const svg = await graph.innerHTML();
     assert.match(svg, />CrewPip</);
     assert.equal(await graph.locator(".graph-spoke").count(), 3, "eine Speiche je Chat");
-    assert.equal(await graph.locator(".graph-edge").count(), 1, "eine Kante für den Weg innerhalb des Repos");
+    assert.equal(await graph.locator(".graph-edge").count(), 2, "Hin- und Rückweg innerhalb des Repos, der beendete Chat ohne Knoten");
+    const paths = await graph.locator(".graph-edge path").evaluateAll(els => els.map(e => e.getAttribute("d")));
+    const labels = await graph.locator(".graph-count").evaluateAll(els => els.map(e => `${e.getAttribute("x")},${e.getAttribute("y")}`));
+    assert.notEqual(paths[0], paths[1], "Hin- und Rückweg verdecken sich nicht");
+    assert.notEqual(labels[0], labels[1], "Zahlen von Hin- und Rückweg liegen nicht übereinander");
 
     // Liste der Wege: Absender, Empfänger, Anzahl, letzter Zeitpunkt, kein Inhalt.
     const flows = alpha.getByRole("list", { name: "Nachrichtenwege der letzten 24 Stunden" });
     const text = await flows.innerText();
     assert.match(text, /Codex Umbau[\s\S]*→[\s\S]*PM demo-alpha[\s\S]*2 Nachrichten[\s\S]*zuletzt/);
     assert.match(text, /PM demo-alpha[\s\S]*→[\s\S]*Director[\s\S]*1 Nachricht/, "Weg zum Director in ein anderes Repo");
+    assert.match(text, /Fertiger Thread \(beendet\)[\s\S]*→[\s\S]*PM demo-alpha/, "Weg eines beendeten Chats ist markiert");
     assert.doesNotMatch(await page.locator("main").innerText(), /geheimer Befundtext/);
 
     // Anbieter: Name und Form, nicht nur Farbe.
@@ -97,6 +111,9 @@ test("Übersicht: Verbindung zu CrewPip, Anbieter erkennbar, Zustände erklärt,
     const tip = page.locator(`#${await state.getAttribute("aria-describedby")}`);
     assert.match(await tip.innerText(), /Post kommt nicht sicher von selbst an/);
     assert.equal(await tip.isVisible(), true, "Erklärung sichtbar bei Fokus");
+    await page.keyboard.press("Escape");
+    assert.equal(await tip.isVisible(), false, "Escape blendet die Erklärung aus");
+    assert.equal(await alpha.locator(".graph-scroll").getAttribute("tabindex"), "0", "Grafik per Tastatur scrollbar");
     const pm = alpha.locator(".conn-apps").getByRole("listitem").filter({ hasText: "PM demo-alpha" });
     assert.match(await pm.innerText(), /Post kommt an/);
 
@@ -106,5 +123,6 @@ test("Übersicht: Verbindung zu CrewPip, Anbieter erkennbar, Zustände erklärt,
     await en.waitFor();
     assert.match(await en.innerText(), /Messages arrive/);
     assert.match(await en.getByRole("group", { name: "demo-alpha" }).getByRole("list", { name: "Message paths in the last 24 hours" }).innerText(), /2 messages/);
+    assert.deepEqual(consoleErrors.filter(e => /key/i.test(e)), [], "keine doppelten React-Schlüssel");
   } finally { await page.close(); }
 });

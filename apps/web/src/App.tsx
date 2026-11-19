@@ -72,18 +72,27 @@ function Board() {
 
   useEffect(() => {
     let closed = false;
+    let flowTimer: ReturnType<typeof setTimeout> | undefined;
+    let flowSeq = 0;
     let ws: WebSocket | null = null;
     let retry: ReturnType<typeof setTimeout>;
     async function refresh() {
+      const seq = ++flowSeq;
       try {
         const urls = ["/api/messages", "/api/sessions", "/api/tasks?status=open,claimed,review,done,cancelled", "/api/projects", "/api/runs", "/api/flows"];
         const [m, s, t, p, r, f] = await Promise.all(urls.map(async url => { const res = await api(url); if (!res.ok) throw new Error(`Daten konnten nicht geladen werden (${res.status}).`); return res.json(); }));
-        if (!closed) { setMessages(m); setSessions(s); setTasks(t); setProjects(p); setRuns(r); setFlows(f); setLoaded(true); }
+        if (!closed) { setMessages(m); setSessions(s); setTasks(t); setProjects(p); setRuns(r); if (seq === flowSeq) setFlows(f); setLoaded(true); }
       } catch (e) { if (!closed) setError(`${e instanceof Error ? e.message : "Verbindung fehlgeschlagen."} Bitte die Seite neu laden.`); }
     }
     // Nachrichtenwege der letzten 24 Stunden: neu holen bei jeder Zustellung und beim Abgleich.
-    async function loadFlows() {
-      try { const res = await api("/api/flows"); if (res.ok && !closed) setFlows(await res.json()); } catch { /* Anzeige bleibt beim letzten Stand. */ }
+    // Gebündelt: Eine Abholung verbucht bis zu 50 Zustellungen einzeln, geladen wird einmal.
+    // Die Nummer verwirft Antworten, die eine neuere Anfrage überholt hat.
+    function loadFlows() {
+      clearTimeout(flowTimer);
+      flowTimer = setTimeout(async () => {
+        const seq = ++flowSeq;
+        try { const res = await api("/api/flows"); const f = res.ok ? await res.json() : null; if (f && !closed && seq === flowSeq) setFlows(f); } catch { /* Anzeige bleibt beim letzten Stand. */ }
+      }, 300);
     }
     const connect = () => {
       if (closed) return;
@@ -98,7 +107,7 @@ function Board() {
         if (e.type === "projects") setProjects(e.projects);
         if (e.type === "runs") setRuns(e.runs);
         if (e.type === "run-item") setLiveItems(m => ({ ...m, [e.runId]: [...(m[e.runId] ?? []), e.item] }));
-        if (e.type === "delivery") void loadFlows();
+        if (e.type === "delivery") loadFlows();
         if (e.type === "delivery") setMessages(m => m.map(x => x.id !== e.messageId || x.deliveries.some(d => d.sessionId === e.delivery.sessionId) ? x : { ...x, deliveries: [...x.deliveries, e.delivery], pending: x.pending.filter(p => p !== e.delivery.sessionLabel) }));
       };
     };
@@ -106,10 +115,10 @@ function Board() {
     // regelmäßig neu holen, damit "verbunden" nicht stehen bleibt, wenn eine App beendet wurde.
     const poll = setInterval(() => {
       void api("/api/sessions").then(res => res.ok ? res.json() : null).then(s => { if (s && !closed) setSessions(s); }).catch(() => {});
-      void loadFlows();
+      loadFlows();
     }, 30000);
     void refresh(); connect();
-    return () => { closed = true; clearTimeout(retry); clearInterval(poll); ws?.close(); };
+    return () => { closed = true; clearTimeout(retry); clearTimeout(flowTimer); clearInterval(poll); ws?.close(); };
   }, []);
   // CLI sign-in probes can take seconds. Do not block the overview on them.
   useEffect(() => {

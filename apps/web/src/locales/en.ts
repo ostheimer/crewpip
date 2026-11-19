@@ -64,6 +64,8 @@ export const en = {
   flowTo: "to",
   flowCount: (n: number) => n === 1 ? "1 message" : `${n} messages`,
   flowLast: "last",
+  flowEnded: "ended",
+  graphScroll: "Connection diagram, scrolls sideways in narrow windows",
   noFlows: "No delivered messages in the last 24 hours.",
   noAppChat: (app: string) => `No ${app} chat`,
   lastContact: "Last contact",
@@ -252,7 +254,7 @@ export const en = {
       connected: "Connected to CrewPip: the hook has reported and the app is running. Messages arrive at the next turn, even while the chat is idle.",
       "no-hook": "CrewPip knows the chat, but its hook has never reported. Whether messages arrive on their own is uncertain; the chat can always fetch them with `read_inbox` or `wait_for_message`.",
       stale: "The chat's app is no longer running. The entry was left behind.",
-      ended: "Unregistered. Not shown in the overview.",
+      ended: "Unregistered. No longer shown as a chat in the overview; its message paths from the last 24 hours stay in the list, marked “ended”.",
     },
     fixTitle: (noHook: string) => `Fixing “${noHook}”`,
     fix: (connected: string) => [

@@ -1,4 +1,4 @@
-import { useId } from "react";
+import { useId, useState } from "react";
 import { APP_LABELS, ROLE_LABELS, type AppKind, type MessageFlow, type Project, type Session } from "@crewpip/shared";
 import { CircleHelp } from "lucide-react";
 import { useBoardLanguage } from "./language.tsx";
@@ -18,8 +18,11 @@ const time = (iso: string, locale: string) => {
 function StateBadge({ session }: { session: Session }) {
   const { ui } = useBoardLanguage();
   const id = `conn-hint-${useId().replace(/[^\w-]/g, "")}`;
-  return <span className="conn-state-wrap">
-    <span tabIndex={0} className={`conn-state conn-${session.connection}`} aria-describedby={id}><i aria-hidden="true" />{ui.connectionState[session.connection]}<CircleHelp size={13} aria-hidden="true" /></span>
+  // Escape blendet die Erklärung aus (WCAG 1.4.13); beim nächsten Fokus oder Hovern ist sie wieder da.
+  const [hidden, setHidden] = useState(false);
+  return <span className={`conn-state-wrap ${hidden ? "tip-hidden" : ""}`} onMouseLeave={() => setHidden(false)}>
+    <span tabIndex={0} className={`conn-state conn-${session.connection}`} aria-describedby={id}
+      onKeyDown={e => { if (e.key === "Escape") setHidden(true); }} onBlur={() => setHidden(false)}><i aria-hidden="true" />{ui.connectionState[session.connection]}<CircleHelp size={13} aria-hidden="true" /></span>
     <span role="tooltip" id={id} className="conn-tip">{ui.connectionHint[session.connection]}</span>
   </span>;
 }
@@ -41,28 +44,40 @@ const short = (s: string, n = 15) => s.length > n ? `${s.slice(0, n - 1)}…` : 
 function StarGraph({ name, sessions, flows }: { name: string; sessions: Session[]; flows: MessageFlow[] }) {
   const { ui } = useBoardLanguage();
   const W = 520, H = 300, cx = W / 2, cy = H / 2, rx = 120, ry = 100;
+  // Ab neun Chats abwechselnd auf zwei Ringen, damit Symbole und Namen nicht übereinander liegen.
+  const twoRings = sessions.length > 8;
   const pos = new Map(sessions.map((s, i) => {
     const a = -Math.PI / 2 + (2 * Math.PI * i) / Math.max(sessions.length, 1);
-    return [s.id, { x: cx + rx * Math.cos(a), y: cy + ry * Math.sin(a), a }];
+    const f = twoRings && i % 2 ? 0.62 : 1;
+    return [s.id, { x: cx + rx * f * Math.cos(a), y: cy + ry * f * Math.sin(a), a }];
   }));
-  const edges = flows.filter(f => f.from.kind === "session" && pos.has(f.from.id) && pos.has(f.to.id) && f.from.id !== f.to.id);
+  const edges = flows.flatMap(f => f.from.kind === "session" && pos.has(f.from.id) && pos.has(f.to.id) && f.from.id !== f.to.id ? [{ from: f.from.id, to: f.to.id, count: f.count }] : []);
+  const pairs = new Set(edges.map(e => `${e.from}>${e.to}`));
   const markerId = `arrow-${useId().replace(/[^\w-]/g, "")}`;
-  return <div className="graph-scroll"><svg className="conn-graph" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={ui.graphLabel(name, sessions.length, edges.length)}>
+  return <div className="graph-scroll" tabIndex={0} role="group" aria-label={ui.graphScroll}><svg className="conn-graph" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={ui.graphLabel(name, sessions.length, edges.length)}>
     <defs><marker id={markerId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" className="graph-arrow" /></marker></defs>
     {sessions.map(s => { const p = pos.get(s.id)!; return <line key={s.id} className={`graph-spoke conn-${s.connection}`} x1={cx} y1={cy} x2={p.x} y2={p.y} />; })}
-    {edges.map(f => {
-      const a = pos.get(f.from.kind === "session" ? f.from.id : "")!, b = pos.get(f.to.id)!;
+    {edges.map(e => {
+      const a = pos.get(e.from)!, b = pos.get(e.to)!;
       const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-      let dx = mx - cx, dy = my - cy;
-      const len = Math.hypot(dx, dy);
-      // Bogen nach außen, damit er nicht durch die Nabe läuft; gegenüberliegende Chats: seitlich.
-      const opposite = len < 20;
-      if (opposite) { dx = -(b.y - a.y); dy = b.x - a.x; }
-      const k = (opposite ? 110 : 60) / (Math.hypot(dx, dy) || 1);
-      const qx = mx + dx * k, qy = my + dy * k;
-      return <g key={`${a.x},${b.x},${f.to.id}`} className="graph-edge">
-        <path d={`M${a.x},${a.y} Q${qx},${qy} ${b.x},${b.y}`} markerEnd={`url(#${markerId})`} />
-        <text x={(mx + qx) / 2} y={(my + qy) / 2} className="graph-count">{f.count}</text>
+      // Gemeinsame Normale je Paar (unabhängig von der Richtung); Hin- und Rückweg liegen auf
+      // verschiedenen Seiten, damit sich Bögen und Zahlen nicht verdecken.
+      const [p, q] = e.from < e.to ? [a, b] : [b, a];
+      const dl = Math.hypot(q.x - p.x, q.y - p.y) || 1;
+      const nx = -(q.y - p.y) / dl, ny = (q.x - p.x) / dl;
+      const side = pairs.has(`${e.to}>${e.from}`) ? (e.from < e.to ? 1 : -1) : 0;
+      let ox = mx - cx, oy = my - cy;
+      const ol = Math.hypot(ox, oy);
+      let bend: number;
+      if (ol < 20) { ox = nx; oy = ny; bend = 110 * (side || 1); }
+      else { ox /= ol; oy /= ol; bend = 60; }
+      const qx = mx + ox * bend + nx * side * 26, qy = my + oy * bend + ny * side * 26;
+      // Anfang und Ende vor dem Knotensymbol, damit die Pfeilspitze sichtbar bleibt.
+      const cut = (from: { x: number; y: number }, by: number) => { const l = Math.hypot(qx - from.x, qy - from.y) || 1; return { x: from.x + ((qx - from.x) / l) * by, y: from.y + ((qy - from.y) / l) * by }; };
+      const s0 = cut(a, 10), s1 = cut(b, 12);
+      return <g key={`${e.from}>${e.to}`} className="graph-edge">
+        <path d={`M${s0.x},${s0.y} Q${qx},${qy} ${s1.x},${s1.y}`} markerEnd={`url(#${markerId})`} />
+        <text x={(mx + qx) / 2} y={(my + qy) / 2 + 4} className="graph-count">{e.count}</text>
       </g>;
     })}
     <g className="graph-hub"><rect x={cx - 52} y={cy - 18} width={104} height={36} /><text x={cx} y={cy + 5}>CrewPip</text></g>
@@ -78,10 +93,10 @@ function StarGraph({ name, sessions, flows }: { name: string; sessions: Session[
   </svg></div>;
 }
 
-function FlowEnd({ end, projectId }: { end: MessageFlow["from"] | MessageFlow["to"]; projectId: string }) {
+function FlowEnd({ end, projectId, live }: { end: MessageFlow["from"] | MessageFlow["to"]; projectId: string; live: Set<string> }) {
   const { ui } = useBoardLanguage();
   if ("kind" in end && end.kind === "human") return <span className="flow-end"><span className="badge app-human">{ui.person}</span> {end.name}</span>;
-  return <span className="flow-end"><AppMark app={end.app} /> <strong>{end.projectId === projectId ? end.name : `${end.project} / ${end.name}`}</strong></span>;
+  return <span className="flow-end"><AppMark app={end.app} /> <strong>{end.projectId === projectId ? end.name : `${end.project} / ${end.name}`}</strong>{!live.has(end.id) && <em className="flow-ended"> ({ui.flowEnded})</em>}</span>;
 }
 
 /**
@@ -91,6 +106,7 @@ function FlowEnd({ end, projectId }: { end: MessageFlow["from"] | MessageFlow["t
 export function Connections({ sessions, projects, projectId, flows }: { sessions: Session[]; projects: Project[]; projectId: string | null; flows: MessageFlow[] }) {
   const { ui, locale } = useBoardLanguage();
   const live = sessions.filter(s => s.connection !== "ended");
+  const liveIds = new Set(live.map(s => s.id));
   const director = live.filter(s => s.role === "director").sort((a, b) => STATE_ORDER[a.connection] - STATE_ORDER[b.connection])[0];
   const groups = new Map<string, { name: string; sessions: Session[] }>();
   for (const s of live) {
@@ -119,7 +135,7 @@ export function Connections({ sessions, projects, projectId, flows }: { sessions
           <div className="conn-flows"><h4>{ui.flowsTitle}</h4>
             {mine.length
               ? <ul aria-label={ui.flowsTitle}>{mine.map(f => <li key={`${f.from.kind === "session" ? f.from.id : f.from.name}>${f.to.id}`}>
-                  <FlowEnd end={f.from} projectId={id} /> <span aria-hidden="true">→</span><span className="sr-only">{ui.flowTo}</span> <FlowEnd end={f.to} projectId={id} />
+                  <FlowEnd end={f.from} projectId={id} live={liveIds} /> <span aria-hidden="true">→</span><span className="sr-only">{ui.flowTo}</span> <FlowEnd end={f.to} projectId={id} live={liveIds} />
                   <span className="flow-meta"> · {ui.flowCount(f.count)} · {ui.flowLast} {time(f.lastAt, locale)}</span>
                 </li>)}</ul>
               : <p className="conn-empty">{ui.noFlows}</p>}

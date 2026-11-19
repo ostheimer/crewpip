@@ -76,7 +76,7 @@ is documented in [verbindung.md](verbindung.md) (German).
 | Messages arrive | Connected to CrewPip: the hook has reported and the app is running. Messages arrive at the next turn, even while the chat is idle. |
 | Without hook | CrewPip knows the chat, but its hook has never reported. Whether messages arrive on their own is uncertain; the chat can always fetch them with `read_inbox` or `wait_for_message`. |
 | Stale | The chat's app is no longer running. The entry was left behind. |
-| Ended | Unregistered. Not shown in the overview. |
+| Ended | Unregistered. No longer shown as a chat in the overview; its message paths from the last 24 hours stay in the list, marked “ended”. |
 
 Fixing “Without hook”:
 

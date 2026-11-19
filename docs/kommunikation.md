@@ -77,7 +77,7 @@ genaue Regel steht in [verbindung.md](verbindung.md).
 | Post kommt an | Mit CrewPip verbunden: Der Hook hat sich gemeldet und das Programm läuft. Post kommt beim nächsten Turn an, auch wenn der Chat gerade ruht. |
 | Ohne Hook | CrewPip kennt den Chat, aber sein Hook hat sich noch nie gemeldet. Ob Post von selbst ankommt, ist offen; sicher abholen kann der Chat sie mit `read_inbox` oder `wait_for_message`. |
 | Veraltet | Das Programm des Chats läuft nicht mehr. Der Eintrag ist liegen geblieben. |
-| Beendet | Ausgetragen. Erscheint nicht in der Übersicht. |
+| Beendet | Ausgetragen. Erscheint nicht mehr als Chat in der Übersicht; seine Nachrichtenwege der letzten 24 Stunden bleiben mit dem Vermerk „beendet“ in der Liste. |
 
 „Ohne Hook“ beheben:
 

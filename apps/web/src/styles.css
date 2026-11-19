@@ -540,8 +540,13 @@ input, select, textarea { border-radius: 2px; border: 1px solid var(--border-str
 .conn-state:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .conn-tip { display: none; position: absolute; z-index: 20; left: 0; top: calc(100% + 6px); width: max-content; max-width: min(320px, 80vw);
   background: var(--panel); color: var(--text); border: 1px solid var(--frame); border-radius: 4px; padding: 8px 10px; font-size: 13px; font-weight: 400; line-height: 1.45; box-shadow: var(--glow); }
-.conn-state:hover + .conn-tip, .conn-state:focus + .conn-tip { display: block; }
+.conn-state-wrap:hover .conn-tip, .conn-state:focus + .conn-tip { display: block; }
+.conn-state-wrap.tip-hidden .conn-tip { display: none; }
+/* Brücke über den Abstand, damit die Erklärung beim Hinüberfahren mit der Maus offen bleibt. */
+.conn-tip::before { content: ""; position: absolute; left: 0; right: 0; top: -8px; height: 8px; }
 .conn-chat-head .app-mark { flex-shrink: 0; }
+.graph-scroll:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.flow-ended { color: var(--muted); }
 .graph-scroll { overflow-x: auto; margin: 6px 0 2px; border: 1px solid var(--border); border-radius: 2px; background: var(--bg); }
 .conn-graph { display: block; width: 100%; min-width: 460px; height: auto; }
 .conn-graph text { font-family: var(--font-body); font-size: 13px; fill: var(--text); }
