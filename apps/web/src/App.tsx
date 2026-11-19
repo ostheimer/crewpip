@@ -7,6 +7,7 @@ import { api, ConnectionError, wsUrl } from "./api.ts";
 import { Tasks } from "./Tasks.tsx";
 import { Content } from "./Content.tsx";
 import { Connections } from "./Connections.tsx";
+import { useTheme } from "./theme.ts";
 
 const NAME_KEY = "crewpip.humanName";
 type View = "overview" | "messages" | "tasks" | "guide";
@@ -39,6 +40,7 @@ export function App() {
 
 function Board() {
   const { ui, language, chooseLanguage, locale } = useBoardLanguage();
+  const { theme, chooseTheme } = useTheme();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -167,6 +169,8 @@ function Board() {
       <button className="text-button all-projects" onClick={() => setShowAllProjects(v => !v)}>{showAllProjects ? ui.relevantProjects : ui.allProjectCount(projects.length)}</button>
       <div className="sidebar-bottom"><select className="language-select" aria-label={ui.language} value={language} onChange={e => chooseLanguage(e.target.value === "de" ? "de" : "en")}>
         <option value="de" lang="de">Deutsch</option><option value="en" lang="en">English</option>
+      </select><select className="language-select" aria-label={ui.theme} value={theme} onChange={e => chooseTheme(e.target.value === "light" ? "light" : e.target.value === "system" ? "system" : "dark")}>
+        <option value="dark">{ui.themeDark}</option><option value="light">{ui.themeLight}</option><option value="system">{ui.themeSystem}</option>
       </select><button className="text-button" onClick={() => setView("guide")}><CircleHelp size={17} />{ui.help}</button><span className={`connection ${connected ? "online" : ""}`}><i />{connected ? ui.connected : ui.connecting}</span></div>
     </aside>
     <main className="main">

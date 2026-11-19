@@ -168,6 +168,10 @@ export const en = {
   image: "[Image:",
   noDescription: "no description",
   language: "Language",
+  theme: "Appearance",
+  themeSystem: "System",
+  themeDark: "Dark",
+  themeLight: "Light",
   succeeded: "succeeded",
   failed: "failed",
 
