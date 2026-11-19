@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, CheckCheck, CircleHelp, Folder, LayoutDashboard, ListTodo, MessageSquare, Search, Send, Radio, ChevronRight, Plus } from "lucide-react";
+import { ArrowRight, CheckCheck, Cog, CircleHelp, Folder, LayoutDashboard, ListTodo, MessageSquare, Search, Send, Radio, ChevronRight, Plus } from "lucide-react";
 import { APP_LABELS, ROLE_LABELS, SESSION_ROLES, type AppKind, type Message, type Project, type Run, type RunItem, type Session, type Task, type WsEvent } from "@crewpip/shared";
 import { LanguageProvider, recipientLabel, useBoardLanguage } from "./language.tsx";
 import { displayError } from "./errors.ts";
@@ -153,7 +153,7 @@ function Board() {
 
   return <div className="layout">
     <aside className="sidebar">
-      <a className="brand" href="#" onClick={e => { e.preventDefault(); setView("overview"); setProjectId(null); }}><span className="brand-mark"><LayoutDashboard size={19} /></span>CrewPip<span className="brand-dot">.</span></a>
+      <a className="brand" href="#" onClick={e => { e.preventDefault(); setView("overview"); setProjectId(null); }}><span className="brand-mark"><Cog size={19} /></span>CrewPip<span className="brand-dot">.</span></a>
       <div className="workspace-label">{ui.workspaceBrand}</div>
       <nav className="primary-nav" aria-label={ui.navigation}>
         {([["overview", ui.overview, LayoutDashboard], ["tasks", ui.tasks, ListTodo], ["messages", ui.messages, MessageSquare]] as const).map(([id, label, Icon]) => <button key={id} className={view === id ? "active" : ""} aria-current={view === id ? "page" : undefined} onClick={() => setView(id)}><Icon size={18} />{label}{id === "tasks" && <span className="nav-count">{openTasks.length}</span>}</button>)}

@@ -1,0 +1,94 @@
+/*
+ * Zentrale Design-Tokens (Retro-Steampunk, Issue #9).
+ * Hell: Pergament, Messing, Kupfer. Dunkel: Nussholz, Leder, Messing.
+ * Alle Farben im Rest der Oberfläche kommen aus diesen Variablen.
+ * Kontrast wird von apps/web/test/contrast.test.mjs gegen WCAG AA geprüft.
+ * Schrift: Alegreya SC (SIL OFL 1.1) liegt unter public/fonts, kein Netzzugriff nötig.
+ */
+@font-face { font-family: "Alegreya SC"; font-weight: 700; font-style: normal; font-display: swap; src: url("/fonts/alegreya-sc-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Alegreya SC"; font-weight: 400; font-style: normal; font-display: swap; src: url("/fonts/alegreya-sc-latin-400-normal.woff2") format("woff2"); }
+
+:root {
+  color-scheme: light;
+  /* Schriften */
+  --font-display: "Alegreya SC", "Hoefler Text", "Iowan Old Style", Georgia, serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-body);
+
+  /* Flächen und Text */
+  --bg: #efe5d0;
+  --panel: #fbf6e9;
+  --border: #cdb98d;
+  --border-strong: #8a6c3c;
+  --text: #2a1f15;
+  --muted: #5b4733;
+  /* Akzent (Kupfer) */
+  --accent: #8a4318;
+  --accent-bg: #ead8b4;
+  --accent-solid: #8a4318;
+  --on-accent: #fff8ea;
+  --focus: #1f5f8b;
+  /* Status */
+  --danger: #9a2a1a;
+  --attention-fg: #7a4f00;
+  --attention-line: #9c7220;
+  --warn-bg: #f6e3b0;
+  --warn-fg: #6b4300;
+  --error-bg: #f7dcd2;
+  --error-fg: #8f2615;
+  --ok-bg: #dcebd3;
+  --ok-fg: #1e5a2c;
+  --connected: #1e6b34;
+  --no-hook: #8a4f00;
+  /* Chat-Programme */
+  --claude-bg: #e6dcf0; --claude-fg: #4a2f73;
+  --codex-bg: #d4e8dc; --codex-fg: #1b5133;
+  --cursor-bg: #f3d9c8; --cursor-fg: #7a2f10;
+  --human-bg: #e7dcc4; --human-fg: #46372a;
+  /* Ornamente */
+  --brass: #a47d2c;
+  --brass-light: #e2c680;
+  --brass-dark: #6f5420;
+  --rivet: radial-gradient(circle at 35% 30%, #f1dca0 0 1px, #b08a3a 2px 3px, #6f5420 4px, transparent 4.5px);
+  --paper: radial-gradient(circle at 20% 0%, #f6edd8 0, transparent 55%), radial-gradient(circle at 100% 100%, #e6d8ba 0, transparent 50%);
+  --shadow: 0 1px 0 #fff8e6 inset, 0 1px 3px #4a361c26;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #1c150f;
+    --panel: #29201a;
+    --border: #5a4730;
+    --border-strong: #a8885a;
+    --text: #f3e8d2;
+    --muted: #d1bf9e;
+    --accent: #e8b865;
+    --accent-bg: #43301c;
+    --accent-solid: #9c5a1f;
+    --on-accent: #fff6e4;
+    --focus: #8ac4f0;
+    --danger: #ff9f8c;
+    --attention-fg: #f0c872;
+    --attention-line: #9c7220;
+    --warn-bg: #4d3a14;
+    --warn-fg: #f4d28a;
+    --error-bg: #4b2620;
+    --error-fg: #ffcfc2;
+    --ok-bg: #1f3d2a;
+    --ok-fg: #b9e8c4;
+    --connected: #86d79b;
+    --no-hook: #f2bd6b;
+    --claude-bg: #3d2c5c; --claude-fg: #dccdf5;
+    --codex-bg: #1c4a34; --codex-fg: #b6e8cc;
+    --cursor-bg: #5c2b18; --cursor-fg: #f7cdb6;
+    --human-bg: #4a3c2c; --human-fg: #e6d8c0;
+    --brass: #c9a24d;
+    --brass-light: #f0d890;
+    --brass-dark: #7d6126;
+    --rivet: radial-gradient(circle at 35% 30%, #f4e2a8 0 1px, #c9a24d 2px 3px, #6a5020 4px, transparent 4.5px);
+    --paper: radial-gradient(circle at 20% 0%, #2a2018 0, transparent 55%), radial-gradient(circle at 100% 100%, #231a12 0, transparent 50%);
+    --shadow: 0 1px 0 #ffffff0d inset, 0 1px 4px #00000066;
+  }
+}
