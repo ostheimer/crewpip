@@ -60,3 +60,10 @@ test("Glühen steht nicht auf Fließtext-Selektoren", () => {
   const withTextShadow = [...styles.matchAll(/([^{}]+)\{[^}]*text-shadow:\s*var\(--text-glow\)/g)].map(m => m[1].trim());
   for (const sel of withTextShadow) assert.match(sel, /^(h1|h2|\.brand|\.stat strong)/, `Glühen auf ${sel}`);
 });
+test("kleine Bedienelemente und Warntexte unterschreiten die Mindestgrößen nicht", () => {
+  const layer = styles.slice(styles.indexOf("Retro-Terminal-Schicht"));
+  for (const [sel, min] of [[".warn", 15], [".section-heading .text-button", 13], [".all-projects", 13]]) {
+    const m = [...layer.matchAll(new RegExp(`(?:^|\\n)${sel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\{[^}]*font-size:\\s*(\\d+)px`, "g"))];
+    assert.ok(m.length && Number(m.at(-1)[1]) >= min, `${sel} < ${min}px`);
+  }
+});

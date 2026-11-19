@@ -387,6 +387,10 @@ h2 { font-size: 18px; font-weight: 700; color: var(--accent); text-shadow: var(-
 .stat strong { font-size: 44px; line-height: 1; color: var(--accent); text-shadow: var(--text-glow); }
 .stat.attention strong { color: var(--attention-fg); text-shadow: none; }
 .stat > span { color: var(--text); font-weight: 600; }
+.warn { font-size: 15px; }
+.section-heading .text-button { font-size: 13px; }
+.all-projects { font-size: 13px !important; }
+@media (max-width: 700px) { .mobile-project { font-size: 15px; } }
 .language-select { width: 100%; }
 .sidebar-bottom { flex-wrap: wrap; }
 
@@ -444,7 +448,7 @@ input, select, textarea { border-radius: 2px; border: 1px solid var(--border-str
 .task.claimed { border-left: 4px solid var(--accent); }
 .task.review { border-left: 4px dashed var(--attention-line); }
 .task.done, .task.cancelled { opacity: 1; }
-.task.done h3, .task.cancelled header b { text-decoration: line-through; text-decoration-thickness: 1px; }
+.task.done header b, .task.cancelled header b { text-decoration: line-through; text-decoration-thickness: 1px; }
 .error-banner, .notice-banner { border-bottom: 2px solid currentColor; font-size: 15px; }
 .error-banner::before { content: "✕ "; } .notice-banner::before { content: "✓ "; }
 .markdown pre, .markdown code { border: 1px solid var(--border); border-radius: 2px; }
