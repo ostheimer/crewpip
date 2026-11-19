@@ -50,6 +50,8 @@ export function renderMessages(msgs: Message[]): string {
     .join("\n\n---\n\n");
 }
 
+const CONNECTION_WORDS: Record<Session["connection"], string> = { connected: "verbunden", "no-hook": "ohne-hook", stale: "veraltet", ended: "beendet" };
+
 function renderSessions(all: Session[], self: Session | null): string {
   const byProject = new Map<string, Session[]>();
   for (const s of all) byProject.set(s.project, [...(byProject.get(s.project) ?? []), s]);
@@ -60,7 +62,7 @@ function renderSessions(all: Session[], self: Session | null): string {
       lines.push(
         `  ${s.id === self?.id ? "*" : "-"} ${APP_LABELS[s.app]} / ${s.name}` +
           `${s.role ? `  [${ROLE_LABELS[s.role]}]` : ""}` +
-          `${s.worktree ? `  worktree=${s.worktree}` : ""}  status=${s.status}` +
+          `${s.worktree ? `  worktree=${s.worktree}` : ""}  status=${s.status}  verbindung=${CONNECTION_WORDS[s.connection]}` +
           `  Ziel: ${s.role === "director" ? "director" : s.role === "pm" ? `pm:${s.project}` : `session:${s.id}`}`,
       );
     }
@@ -70,6 +72,7 @@ function renderSessions(all: Session[], self: Session | null): string {
     "Weitere Ziele: all, app:claude, app:cursor, app:codex, human:<name>.",
     "pm:<projekt> und director folgen der Rolle, nicht der Sitzung: Sie erreichen auch den,",
     "der die Rolle erst später übernimmt, und überstehen einen Neustart.",
+    "verbindung=ohne-hook oder veraltet: Post erreicht diesen Chat nicht von selbst (docs/verbindung.md).",
   );
   return lines.join("\n");
 }
