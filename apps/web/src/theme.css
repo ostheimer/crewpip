@@ -2,7 +2,7 @@
  * Zentrale Design-Tokens (Retro-Steampunk, Issue #9).
  * Hell: Pergament, Messing, Kupfer. Dunkel: Nussholz, Leder, Messing.
  * Alle Farben im Rest der Oberfläche kommen aus diesen Variablen.
- * Kontrast wird von scripts/check-contrast.mjs gegen WCAG AA geprüft.
+ * Kontrast wird von apps/web/test/contrast.test.mjs gegen WCAG AA geprüft.
  * Schrift: Alegreya SC (SIL OFL 1.1) liegt unter public/fonts, kein Netzzugriff nötig.
  */
 @font-face { font-family: "Alegreya SC"; font-weight: 700; font-style: normal; font-display: swap; src: url("/fonts/alegreya-sc-latin-700-normal.woff2") format("woff2"); }
@@ -32,7 +32,7 @@
   /* Status */
   --danger: #9a2a1a;
   --attention-fg: #7a4f00;
-  --attention-line: #b98a2e;
+  --attention-line: #9c7220;
   --warn-bg: #f6e3b0;
   --warn-fg: #6b4300;
   --error-bg: #f7dcd2;
@@ -71,7 +71,7 @@
     --focus: #8ac4f0;
     --danger: #ff9f8c;
     --attention-fg: #f0c872;
-    --attention-line: #b98a2e;
+    --attention-line: #9c7220;
     --warn-bg: #4d3a14;
     --warn-fg: #f4d28a;
     --error-bg: #4b2620;

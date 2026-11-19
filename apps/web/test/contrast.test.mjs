@@ -26,7 +26,7 @@ const TEXT_PAIRS = [
   ["connected", "panel"], ["connected", "bg"], ["no-hook", "panel"], ["no-hook", "bg"],
   ["claude-fg", "claude-bg"], ["codex-fg", "codex-bg"], ["cursor-fg", "cursor-bg"], ["human-fg", "human-bg"],
 ];
-const UI_PAIRS = [["border-strong", "panel"], ["border-strong", "bg"], ["focus", "bg"], ["focus", "panel"], ["brass", "panel"]];
+const UI_PAIRS = [["border-strong", "panel"], ["border-strong", "bg"], ["focus", "bg"], ["focus", "panel"], ["brass", "panel"], ["brass", "bg"], ["attention-line", "panel"], ["attention-line", "bg"]];
 
 for (const [name, block] of [["hell", light], ["dunkel", dark]]) {
   const t = tokens(block, name === "dunkel" ? tokens(light) : {});
