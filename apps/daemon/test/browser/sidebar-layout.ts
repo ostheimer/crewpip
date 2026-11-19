@@ -54,7 +54,7 @@ for (const [width, height, minVisible] of [[800, 600, 6], [1024, 768, 7], [1440,
           const list = document.querySelector(".project-list");
           const lr = rect(list);
           const links = [...list.querySelectorAll(".project-link")].map(rect);
-          const fullyVisible = links.filter(r => r.top >= lr.top - 0.5 && r.bottom <= lr.bottom + 0.5).length;
+          const fullyVisible = links.filter(r => r.top >= Math.max(lr.top, 0) - 0.5 && r.bottom <= Math.min(lr.bottom, window.innerHeight) + 0.5).length;
           // Überlappung: kein Bereich der Seitenleiste darf den nächsten überdecken.
           const kids = [...document.querySelector(".sidebar").children].map(rect);
           const reach = sel => { const el = document.querySelector(sel); return !!el && getComputedStyle(el).display !== "none"; };
