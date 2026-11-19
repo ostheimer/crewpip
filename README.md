@@ -43,6 +43,8 @@ Start a new chat in the app you connected and ask it to “List my CrewPip chats
 
 A message to an idle chat waits until its next contact. A delivery receipt confirms that the message reached the chat. Check the result separately if you asked for work.
 
+Chats are never connected to each other directly: each chat is connected to CrewPip, which acts as the mailbox in between. [How CrewPip works](docs/communication.md) explains the building blocks, delivery paths, addresses, states and limits.
+
 ## Work with projects and tasks
 
 Opening a chat in a repository registers the project. Chats in Git worktrees are grouped with the main repository. Select a project to see its tasks and registered chats.
