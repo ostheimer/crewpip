@@ -47,7 +47,7 @@ export function Connections({ sessions, projects, projectId }: { sessions: Sessi
     <div className="conn-grid">
       {ordered.map(([id, g]) => {
         const connected = g.sessions.filter(s => s.connection === "connected").length;
-        const pm = g.sessions.find(s => s.role === "pm");
+        const pm = g.sessions.filter(s => s.role === "pm").sort((a, b) => STATE_ORDER[a.connection] - STATE_ORDER[b.connection] || b.lastSeenAt.localeCompare(a.lastSeenAt))[0];
         const apps = [...MAIN_APPS, ...new Set(g.sessions.map(s => s.app).filter(a => !MAIN_APPS.includes(a)))];
         return <section key={id} role="group" aria-label={g.name} className={`conn-project ${connected ? "" : "conn-none"}`}>
           <header><h3>{g.name}</h3><span className="conn-count">{connected ? ui.connectedCount(connected, g.sessions.length) : ui.noConnectedChat}</span></header>
