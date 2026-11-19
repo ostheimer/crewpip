@@ -529,3 +529,45 @@ input, select, textarea { border-radius: 2px; border: 1px solid var(--border-str
   .flow-arrow::after { content: "▼"; right: auto; left: 50%; top: auto; bottom: -2px; transform: translateX(-50%); }
   .guide-list > div { grid-template-columns: 1fr; gap: 4px; }
 }
+
+/* Issue #15: Anbieter, Zustände mit Erklärung, Verbindungsgrafik. Formen statt nur Farbe. */
+.app-mark { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.app-mark svg { fill: currentColor; stroke: currentColor; flex-shrink: 0; }
+.app-mark[data-app=codex] svg { fill: none; stroke-width: 2.2; }
+.conn-state-wrap { position: relative; display: inline-flex; }
+.conn-state { cursor: help; border-radius: 2px; }
+.conn-state svg { opacity: .8; }
+.conn-state:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.conn-tip { display: none; position: absolute; z-index: 20; left: 0; top: calc(100% + 6px); width: max-content; max-width: min(320px, 80vw);
+  background: var(--panel); color: var(--text); border: 1px solid var(--frame); border-radius: 4px; padding: 8px 10px; font-size: 13px; font-weight: 400; line-height: 1.45; box-shadow: var(--glow); }
+.conn-state-wrap:hover .conn-tip, .conn-state:focus + .conn-tip { display: block; }
+.conn-state-wrap.tip-hidden .conn-tip { display: none; }
+/* Brücke über den Abstand, damit die Erklärung beim Hinüberfahren mit der Maus offen bleibt. */
+.conn-tip::before { content: ""; position: absolute; left: 0; right: 0; top: -8px; height: 8px; }
+.conn-chat-head .app-mark { flex-shrink: 0; }
+.graph-scroll:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.flow-ended { color: var(--muted); }
+.graph-scroll { overflow-x: auto; margin: 6px 0 2px; border: 1px solid var(--border); border-radius: 2px; background: var(--bg); }
+.conn-graph { display: block; width: 100%; min-width: 460px; height: auto; }
+.conn-graph text { font-family: var(--font-body); font-size: 13px; fill: var(--text); }
+.graph-spoke { stroke: var(--connected); stroke-width: 2; }
+.graph-spoke.conn-no-hook { stroke: var(--no-hook); stroke-dasharray: 5 4; }
+.graph-spoke.conn-stale { stroke: var(--danger); stroke-dasharray: 2 4; }
+.graph-hub rect { fill: var(--accent-bg); stroke: var(--accent-solid); stroke-width: 2.5; }
+.graph-hub text { text-anchor: middle; font-family: var(--font-display); font-weight: 700; fill: var(--accent); letter-spacing: .04em; }
+.graph-node > g > * { stroke-width: 2; }
+.graph-node.app-claude > g > * { fill: var(--claude-bg); stroke: var(--claude-fg); }
+.graph-node.app-codex > g > * { fill: var(--codex-bg); stroke: var(--codex-fg); }
+.graph-node.app-cursor > g > *, .graph-node.app-other > g > * { fill: var(--panel); stroke: var(--text); }
+.graph-node.conn-no-hook > g > *, .graph-node.conn-stale > g > * { stroke-dasharray: 3 2; }
+.graph-edge path { fill: none; stroke: var(--attention-line); stroke-width: 2; }
+.graph-arrow { fill: var(--attention-line); }
+.conn-graph .graph-count { font-weight: 700; fill: var(--attention-fg); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 4px; }
+.graph-legend { margin: 4px 0 10px; font-size: 13px; color: var(--muted); }
+.conn-flows { margin: 0 0 12px; }
+.conn-flows h4 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.conn-flows ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.conn-flows li { font-size: 15px; overflow-wrap: anywhere; }
+.flow-end strong { font-weight: 600; }
+.flow-meta { color: var(--muted); font-size: 13px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

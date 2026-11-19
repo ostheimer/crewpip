@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, BookOpen, CheckCheck, Cog, CircleHelp, Folder, LayoutDashboard, ListTodo, MessageSquare, Search, Send, Radio, ChevronRight, Plus } from "lucide-react";
-import { APP_LABELS, ROLE_LABELS, SESSION_ROLES, type AppKind, type Message, type Project, type Run, type RunItem, type Session, type Task, type WsEvent } from "@crewpip/shared";
+import { APP_LABELS, ROLE_LABELS, SESSION_ROLES, type AppKind, type Message, type MessageFlow, type Project, type Run, type RunItem, type Session, type Task, type WsEvent } from "@crewpip/shared";
 import { LanguageProvider, recipientLabel, useBoardLanguage } from "./language.tsx";
 import { displayError } from "./errors.ts";
 import { api, ConnectionError, wsUrl } from "./api.ts";
@@ -8,6 +8,7 @@ import { Tasks } from "./Tasks.tsx";
 import { Content } from "./Content.tsx";
 import { Connections } from "./Connections.tsx";
 import { Guide } from "./Guide.tsx";
+import { AppMark } from "./AppMark.tsx";
 import { useTheme } from "./theme.ts";
 
 const NAME_KEY = "crewpip.humanName";
@@ -18,7 +19,7 @@ const preview = (text: string) => text.replace(/[#*`>]/g, "").replace(/\s+/g, " 
 function MessageCard({ message: m, onReply, expanded = false }: { message: Message; onReply: (m: Message) => void; expanded?: boolean }) {
   const { ui, language, locale } = useBoardLanguage();
   return <article className="message-card">
-    <header><span className={`badge app-${m.from.kind === "session" ? m.from.app : "human"}`}>{m.from.kind === "session" ? APP_LABELS[m.from.app] : ui.person}</span>
+    <header>{m.from.kind === "session" ? <AppMark app={m.from.app} /> : <span className="badge app-human">{ui.person}</span>}
       <strong>{m.from.kind === "session" ? `${m.from.project} / ${m.from.name}` : m.from.name}</strong><time dateTime={m.createdAt}>{date(m.createdAt, locale)}</time></header>
     <div className="message-target">{ui.to} {recipientLabel(m, language)} · #{m.id}</div>
     <details open={expanded || undefined}><summary><span>{preview(m.text).slice(0, 230)}{m.text.length > 230 ? "…" : ""}</span><span className="read-more">{ui.expandMessage}</span></summary><Content text={m.text} /></details>
@@ -48,6 +49,7 @@ function Board() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [view, setView] = useState<View>("overview");
   const [runs, setRuns] = useState<Run[]>([]);
+  const [flows, setFlows] = useState<MessageFlow[]>([]);
   const [runApps, setRunApps] = useState<{ app: AppKind; bin: string | null; loggedIn: boolean | null; hint: string }[]>([]);
   const [liveItems, setLiveItems] = useState<Record<number, RunItem[]>>({});
   const [projectId, setProjectId] = useState<string | null>(null);
@@ -70,14 +72,27 @@ function Board() {
 
   useEffect(() => {
     let closed = false;
+    let flowTimer: ReturnType<typeof setTimeout> | undefined;
+    let flowSeq = 0;
     let ws: WebSocket | null = null;
     let retry: ReturnType<typeof setTimeout>;
     async function refresh() {
+      const seq = ++flowSeq;
       try {
-        const urls = ["/api/messages", "/api/sessions", "/api/tasks?status=open,claimed,review,done,cancelled", "/api/projects", "/api/runs"];
-        const [m, s, t, p, r] = await Promise.all(urls.map(async url => { const res = await api(url); if (!res.ok) throw new Error(`Daten konnten nicht geladen werden (${res.status}).`); return res.json(); }));
-        if (!closed) { setMessages(m); setSessions(s); setTasks(t); setProjects(p); setRuns(r); setLoaded(true); }
+        const urls = ["/api/messages", "/api/sessions", "/api/tasks?status=open,claimed,review,done,cancelled", "/api/projects", "/api/runs", "/api/flows"];
+        const [m, s, t, p, r, f] = await Promise.all(urls.map(async url => { const res = await api(url); if (!res.ok) throw new Error(`Daten konnten nicht geladen werden (${res.status}).`); return res.json(); }));
+        if (!closed) { setMessages(m); setSessions(s); setTasks(t); setProjects(p); setRuns(r); if (seq === flowSeq) setFlows(f); setLoaded(true); }
       } catch (e) { if (!closed) setError(`${e instanceof Error ? e.message : "Verbindung fehlgeschlagen."} Bitte die Seite neu laden.`); }
+    }
+    // Nachrichtenwege der letzten 24 Stunden: neu holen bei jeder Zustellung und beim Abgleich.
+    // Gebündelt: Eine Abholung verbucht bis zu 50 Zustellungen einzeln, geladen wird einmal.
+    // Die Nummer verwirft Antworten, die eine neuere Anfrage überholt hat.
+    function loadFlows() {
+      clearTimeout(flowTimer);
+      flowTimer = setTimeout(async () => {
+        const seq = ++flowSeq;
+        try { const res = await api("/api/flows"); const f = res.ok ? await res.json() : null; if (f && !closed && seq === flowSeq) setFlows(f); } catch { /* Anzeige bleibt beim letzten Stand. */ }
+      }, 300);
     }
     const connect = () => {
       if (closed) return;
@@ -92,6 +107,7 @@ function Board() {
         if (e.type === "projects") setProjects(e.projects);
         if (e.type === "runs") setRuns(e.runs);
         if (e.type === "run-item") setLiveItems(m => ({ ...m, [e.runId]: [...(m[e.runId] ?? []), e.item] }));
+        if (e.type === "delivery") loadFlows();
         if (e.type === "delivery") setMessages(m => m.map(x => x.id !== e.messageId || x.deliveries.some(d => d.sessionId === e.delivery.sessionId) ? x : { ...x, deliveries: [...x.deliveries, e.delivery], pending: x.pending.filter(p => p !== e.delivery.sessionLabel) }));
       };
     };
@@ -99,9 +115,10 @@ function Board() {
     // regelmäßig neu holen, damit "verbunden" nicht stehen bleibt, wenn eine App beendet wurde.
     const poll = setInterval(() => {
       void api("/api/sessions").then(res => res.ok ? res.json() : null).then(s => { if (s && !closed) setSessions(s); }).catch(() => {});
+      loadFlows();
     }, 30000);
     void refresh(); connect();
-    return () => { closed = true; clearTimeout(retry); clearInterval(poll); ws?.close(); };
+    return () => { closed = true; clearTimeout(retry); clearTimeout(flowTimer); clearInterval(poll); ws?.close(); };
   }, []);
   // CLI sign-in probes can take seconds. Do not block the overview on them.
   useEffect(() => {
@@ -188,7 +205,7 @@ function Board() {
             <button className="stat attention" onClick={() => setView("tasks")}><span><CheckCheck size={18} />{ui.readyForReview}</span><strong>{review.length}</strong><small>{ui.reviewResults} <ArrowRight size={15} /></small></button>
             <div className="stat"><span><Radio size={18} />{ui.startedAgents}</span><strong>{activeRuns.length}</strong><small>{activeRuns.length ? ui.runningHere : ui.noRunningAgent}</small></div>
           </div>
-          <Connections sessions={sessions} projects={visibleProjects} projectId={projectId} />
+          <Connections sessions={sessions} projects={visibleProjects} projectId={projectId} flows={flows} />
           <section className="orientation"><div className="orientation-icon"><Send size={22} /></div><div><h2>{ui.setDirection}</h2><p>{ui.directionIntro}</p><span>{ui.deliveryTiming}</span></div><button className="secondary" onClick={() => setView("guide")}>{ui.howItWorks} <ArrowRight size={15} /></button></section>
           {!directors.length && <div className="error-banner">{ui.noDirector}</div>}
           {!sessions.length && <SetupLinks />}
@@ -201,7 +218,7 @@ function Board() {
         {view === "tasks" && <><div className="page-heading"><div><p className="eyebrow">{ui.taskEyebrow}</p><h1>{ui.tasks}</h1><p>{ui.tasksIntro}</p></div></div><Tasks tasks={tasks} projects={projects} sessions={sessions} projectFilter={projectId} onError={setError} runs={runs} runApps={runApps} liveItems={liveItems} /></>}
         {view === "messages" && <><div className="page-heading"><div><p className="eyebrow">{ui.messageEyebrow}</p><h1>{ui.messages}</h1><p>{ui.messagesIntro}</p></div><button className="primary" onClick={() => write()}><Plus size={17} />{ui.compose}</button></div><div className="message-filters"><label className="search-field"><Search size={17} /><input value={search} onChange={e => setSearch(e.target.value)} aria-label={ui.searchMessages} placeholder={ui.messagePlaceholder} /></label><select aria-label={ui.filterMessages} value={messageScope} onChange={e => setMessageScope(e.target.value)}><option value="all">{ui.allMessages}</option><option value="director">{ui.toDirector}</option><option value="waiting">{ui.pendingDelivery}</option></select><span>{shown.length} {ui.messageCount}</span></div><div className="message-list">{shown.slice(0, 100).map(m => <MessageCard key={m.id} message={m} onReply={reply} />)}{shown.length > 100 && <p>{ui.latestHundred}</p>}{!shown.length && <div className="empty">{ui.noMessages}</div>}</div></>}
         {view === "guide" && <><div className="page-heading"><div><p className="eyebrow">{ui.guide.eyebrow}</p><h1>{ui.guide.title}</h1><p>{ui.guide.intro}</p></div></div><SetupLinks /><Guide onWrite={write} onTasks={() => setView("tasks")} /></>}
-        {selected && <details className="session-settings"><summary>{ui.manageChats(selected.name, projectSessions.length)}</summary><p>{ui.roleGuide}</p>{projectSessions.map(s => <div className="session-setting" key={s.id}><div><strong>{s.name}</strong><small>{APP_LABELS[s.app]} · {ui.connectionState[s.connection]} {ui.lastSeen} {date(s.lastSeenAt, locale)}</small></div><select aria-label={ui.roleFor(s.name)} value={s.role ?? ""} onChange={e => void editSession(s, { role: e.target.value || null })}><option value="">{ui.noRole}</option>{SESSION_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}</select><button className="secondary" onClick={() => { const name = prompt(ui.chatName, s.name); if (name?.trim()) void editSession(s, { name: name.trim() }); }}>{ui.rename}</button><button className="text-button" onClick={() => void forget(s)}>{ui.unregister}</button></div>)}</details>}
+        {selected && <details className="session-settings"><summary>{ui.manageChats(selected.name, projectSessions.length)}</summary><p>{ui.roleGuide}</p>{projectSessions.map(s => <div className="session-setting" key={s.id}><div><strong>{s.name}</strong><small><AppMark app={s.app} /> · {ui.connectionState[s.connection]} {ui.lastSeen} {date(s.lastSeenAt, locale)}</small></div><select aria-label={ui.roleFor(s.name)} value={s.role ?? ""} onChange={e => void editSession(s, { role: e.target.value || null })}><option value="">{ui.noRole}</option>{SESSION_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}</select><button className="secondary" onClick={() => { const name = prompt(ui.chatName, s.name); if (name?.trim()) void editSession(s, { name: name.trim() }); }}>{ui.rename}</button><button className="text-button" onClick={() => void forget(s)}>{ui.unregister}</button></div>)}</details>}
         </>}
       </div>
       {compose && <section className="composer" aria-label={ui.compose}><form onSubmit={e => { e.preventDefault(); void send(); }}><div className="composer-heading"><h2>{ui.compose}</h2><button className="text-button" type="button" onClick={() => setCompose(false)}>{ui.closeDraft}</button></div><div className="composer-fields"><label>{ui.from}<input placeholder={ui.human} value={from} onChange={e => setFrom(e.target.value)} /></label><label>{ui.to}<select value={to} onChange={e => setTo(e.target.value)}><option value="director">{ui.directorOption}</option>{!(["director", "all"].includes(to) || projects.some(p => to === `pm:${p.name}`) || sessions.some(s => to === `session:${s.id}`)) && <option value={to}>{to}</option>}<optgroup label={ui.projectManagers}>{projects.map(p => <option key={p.id} value={`pm:${p.name}`}>PM {p.name}</option>)}</optgroup><optgroup label={ui.singleChat}>{sessions.map(s => <option key={s.id} value={`session:${s.id}`}>{s.label}</option>)}</optgroup><option value="all">{ui.broadcast}</option></select></label></div><textarea ref={input} aria-label={ui.message} rows={3} value={text} onChange={e => setText(e.target.value)} placeholder={ui.composerPlaceholder} onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void send(); } }} /><div className="composer-footer"><small>{roleWaiting ? ui.roleUnavailable : to === "all" ? ui.broadcastHint : ui.sendHint}</small><button className="primary" disabled={sending || !text.trim()} type="submit"><Send size={16} />{sending ? ui.saving : ui.sendMessage}</button></div></form></section>}

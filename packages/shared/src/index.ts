@@ -216,6 +216,28 @@ export interface Delivery {
   at: string;
 }
 
+/** Ende eines Nachrichtenwegs: ein Chat (auch ein inzwischen beendeter). */
+export interface FlowSession {
+  id: string;
+  app: AppKind;
+  projectId: string;
+  project: string;
+  name: string;
+  label: string;
+}
+
+/**
+ * Tatsächlich zugestellte Nachrichten von einem Absender an einen Chat in einem Zeitfenster.
+ * Grundlage sind Zustellungen: Rollenadressen gelten für den Chat, der abgeholt hat.
+ * Bewusst ohne Inhalte.
+ */
+export interface MessageFlow {
+  from: ({ kind: "session" } & FlowSession) | { kind: "human"; name: string };
+  to: FlowSession;
+  count: number;
+  lastAt: string;
+}
+
 export interface Message {
   id: number;
   from: Party;

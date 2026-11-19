@@ -7,6 +7,8 @@ import {
   type Delivery,
   type DeliveryMethod,
   type Message,
+  type MessageFlow,
+  type FlowSession,
   type Party,
   type ConnectionState,
   type Session,
@@ -619,6 +621,35 @@ export class Inbox extends EventEmitter<InboxEvents> {
       this.on("message", onMessage);
       signal?.addEventListener("abort", onAbort, { once: true });
     });
+  }
+
+  /**
+   * Nachrichtenwege seit `since`: je Absender und abholendem Chat Anzahl und letzte Zustellung.
+   * Zählt nur, was tatsächlich zugestellt wurde; so landen `pm:` und `director` beim Chat, der
+   * die Nachricht abgeholt hat. Liefert keine Inhalte.
+   */
+  flows(since: string): MessageFlow[] {
+    const rows = this.db
+      .prepare(
+        `SELECT m.from_kind, m.from_id, d.session_id, COUNT(*) AS n, MAX(d.at) AS last_at
+         FROM deliveries d JOIN messages m ON m.id = d.message_id
+         WHERE d.at >= ?
+         GROUP BY m.from_kind, m.from_id, d.session_id
+         ORDER BY last_at DESC`,
+      )
+      .all(since) as unknown as { from_kind: "session" | "human"; from_id: string; session_id: string; n: number; last_at: string }[];
+    const end = (id: string): FlowSession | null => {
+      const r = this.sessionRow(id);
+      return r ? { id: r.id, app: r.app, projectId: r.project_id ?? "", project: r.project, name: r.name, label: sessionLabel(r.app, r.project, r.name, r.worktree) } : null;
+    };
+    const flows: MessageFlow[] = [];
+    for (const r of rows) {
+      const to = end(r.session_id);
+      const from = r.from_kind === "session" ? end(r.from_id) : null;
+      if (!to || (r.from_kind === "session" && !from)) continue;
+      flows.push({ from: from ? { kind: "session", ...from } : { kind: "human", name: r.from_id }, to, count: Number(r.n), lastAt: r.last_at });
+    }
+    return flows;
   }
 
   recent(limit = 200): Message[] {

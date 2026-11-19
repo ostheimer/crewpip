@@ -15,8 +15,8 @@ next step. The board shows the same explanation under “How CrewPip works”.
  Chat A ↔ Chat B: no direct connection
 ```
 
-“Connected” therefore always means: connected to CrewPip. The delivery receipts under each
-message show which chats actually exchange messages.
+Calling a chat “connected” therefore always means: connected to CrewPip. The delivery receipts under each
+message and the overview on the board show which chats actually exchange messages.
 
 ## Building blocks
 
@@ -73,17 +73,30 @@ is documented in [verbindung.md](verbindung.md) (German).
 
 | Label | Meaning |
 |---|---|
-| Connected | Connected to CrewPip: the hook has reported and the app is running. Messages arrive at the next turn, even while the chat is idle. |
+| Messages arrive | Connected to CrewPip: the hook has reported and the app is running. Messages arrive at the next turn, even while the chat is idle. |
 | Without hook | CrewPip knows the chat, but its hook has never reported. Whether messages arrive on their own is uncertain; the chat can always fetch them with `read_inbox` or `wait_for_message`. |
 | Stale | The chat's app is no longer running. The entry was left behind. |
-| Ended | Unregistered. Not shown in the overview. |
+| Ended | Unregistered. No longer shown as a chat in the overview; its message paths from the last 24 hours stay in the list, marked “ended”. |
 
 Fixing “Without hook”:
 
 1. Run `pnpm snippets --write` in the CrewPip folder.
 2. Copy the hook entries for the app from `config/generated/`. For Codex, run `/hooks`
    afterwards and approve the four CrewPip hooks.
-3. Restart the chat and enter a prompt (Cursor: start a new chat). It then shows “Connected”.
+3. Restart the chat and enter a prompt (Cursor: start a new chat). It then shows “Messages arrive”.
+
+## Overview on the board
+
+Under “Chats on CrewPip” the board shows a star per repository: CrewPip in the middle, each chat
+as a spoke (solid = messages arrive, dashed = without hook or stale). The shape stands for the
+app (circle Claude, square Codex, triangle Cursor), always with its name. These are CrewPip's own
+neutral symbols; Anthropic and OpenAI logos are not used.
+
+Arcs between two chats and the list “Message paths in the last 24 hours” show who actually
+exchanged messages: sender, recipient, count and last time, never the content. They are based on
+deliveries (`flows` in `apps/daemon/src/inbox.ts`, HTTP `GET /api/flows?hours=24`). A message to
+`pm:<project>` or `director` therefore counts for the chat that picked it up. Messages nobody
+picked up do not appear.
 
 ## Limits
 
