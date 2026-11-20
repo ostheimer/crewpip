@@ -6,3 +6,5 @@ data/
 config/generated/
 .env
 .crewpip/
+.local/
+.playwright-mcp/
