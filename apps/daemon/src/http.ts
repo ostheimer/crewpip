@@ -197,7 +197,7 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
       if (typeof b.name === "string") session = inbox.renameSession(req.params.id as string, b.name);
       if (b.role !== undefined) {
         if (b.role !== null && !SESSION_ROLES.includes(b.role)) throw new Error(`Unbekannte Rolle: ${b.role}`);
-        session = inbox.setRole(req.params.id as string, b.role);
+        session = inbox.setRole(req.params.id as string, b.role, "dashboard");
       }
       if (!session) throw new Error("Weder Name noch Rolle angegeben");
       res.json(session);
@@ -205,6 +205,7 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
       res.status(400).json({ error: (e as Error).message });
     }
   });
+  app.get("/api/role-changes", (_req, res) => res.json(inbox.roleChanges()));
   app.delete("/api/sessions/:id", (req, res) => {
     // Trägt eine Session aus der Liste aus. Meldet sie sich wieder (Hook, MCP oder Registry),
     // taucht sie erneut auf; das ist gewollt, denn dann lebt sie noch.

@@ -51,6 +51,40 @@ export function roleFromName(name: string): SessionRole | null {
   return null;
 }
 
+/**
+ * Projekt, dessen PM Rollen in allen Projekten umhängen darf (neben dem Director und dem
+ * jeweiligen Inhaber). CrewPip verwaltet die Rollen, deshalb ist es sein PM (#28).
+ */
+export const ROLE_ADMIN_PROJECT = "crewpip";
+
+/** Rollen, die es je Projekt (PM) oder insgesamt (Director) nur einmal gibt. */
+export type ExclusiveRole = "pm" | "director";
+
+/**
+ * Ein Chat beansprucht eine Rolle per Namen, hat sie aber nicht: Ein anderer Chat hält sie
+ * (holderId), oder mehrere beanspruchen dieselbe freie Rolle (holderId null). CrewPip hängt
+ * dann nicht still um; ein Mensch oder ein berechtigter Chat entscheidet (#28).
+ */
+export interface RoleConflict {
+  role: ExclusiveRole;
+  holderId: string | null;
+  holderLabel: string | null;
+}
+
+/** Protokolleintrag eines Rollenwechsels: wer, wann, von wem zu wem. */
+export interface RoleChange {
+  id: number;
+  role: SessionRole;
+  projectId: string | null;
+  /** Bisheriger Inhaber, null wenn die Rolle frei war */
+  fromSession: string | null;
+  /** Neuer Inhaber, null wenn die Rolle abgegeben wurde */
+  toSession: string | null;
+  /** "session:<id>", "dashboard", "name" (aus dem Chatnamen abgeleitet) oder "system" */
+  actor: string;
+  at: string;
+}
+
 export const RUN_MODES = ["read-only", "worktree-write"] as const;
 /** Was ein von CrewPip gestarteter Agent darf. Mehr als diese zwei Stufen gibt es bewusst nicht. */
 export type RunMode = (typeof RUN_MODES)[number];
@@ -179,6 +213,8 @@ export interface Session {
   task: { id: number; title: string; status: TaskStatus } | null;
   /** Rolle laut docs/rollen.md */
   role: SessionRole | null;
+  /** Gesetzt, wenn der Chat per Namen PM oder Director beansprucht, die Rolle aber nicht hat. */
+  roleConflict: RoleConflict | null;
   /** Nummer des Laufs, aus dem diese Session stammt. Solche Sessions dürfen keine Läufe starten. */
   spawnedByRun: number | null;
 }

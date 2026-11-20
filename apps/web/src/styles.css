@@ -600,6 +600,12 @@ input, select, textarea { border-radius: 2px; border: 1px solid var(--border-str
 .repo-count { font-size: 13px; color: var(--muted); }
 .matrix-none .repo-count { color: var(--danger); font-weight: 700; }
 .repo-alert { color: var(--attention-fg); font-size: 13px; }
+/* #28: Zwei Chats beanspruchen dieselbe Rolle. In Worten, nicht nur als Farbe. */
+.repo-conflict { color: var(--attention-fg); font-size: 12px; border: 1px solid currentColor; border-radius: 999px; padding: 0 6px; white-space: nowrap; }
+.conn-conflict { margin: 0 0 10px; color: var(--attention-fg); font-size: 13px; }
+.conn-conflict ul { margin: 0 0 4px; padding-left: 18px; }
+.conn-conflict p { margin: 0; color: var(--muted); }
+.session-conflict { flex-basis: 100%; color: var(--attention-fg); }
 .matrix-alert { background: var(--warn-bg); box-shadow: inset 4px 0 0 var(--attention-line); }
 .dot-list { display: inline-flex; flex-wrap: wrap; gap: 2px 6px; align-items: center; }
 .dot-wrap { position: relative; display: inline-flex; }

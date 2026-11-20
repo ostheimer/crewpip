@@ -32,6 +32,11 @@ function RoleHolder({ label, holder }: { label: string; holder: Session | undefi
     : <strong>{ui.notAssigned}</strong>}</p>;
 }
 
+function conflictText(s: Session, ui: ReturnType<typeof useBoardLanguage>["ui"]): string {
+  const c = s.roleConflict!;
+  return ui.roleConflictText(s.name, APP_LABELS[s.app], ROLE_LABELS[c.role], c.holderLabel);
+}
+
 const short = (s: string, n = 15) => s.length > n ? `${s.slice(0, n - 1)}…` : s;
 
 /**
@@ -165,6 +170,7 @@ function MatrixRowView({ row, apps, flows, liveIds }: { row: MatrixRow; apps: Ap
         <span className="repo-name">{row.name}</span>
         <span className="repo-count" aria-label={ui.connectedCount(row.connected, total)}>{row.connected}/{total}</span>
         {row.alert && <span className="repo-alert"><span aria-hidden="true">▲</span><span className="sr-only">{ui.matrixAlert}</span></span>}
+        {row.conflicts.length > 0 && <span className="repo-conflict" title={row.conflicts.map(s => conflictText(s, ui)).join("\n")}>{ui.roleConflictBadge}</span>}
       </button></th>
       {apps.map((app, i) => {
         const chats = row.cells[app] ?? [];
@@ -173,6 +179,7 @@ function MatrixRowView({ row, apps, flows, liveIds }: { row: MatrixRow; apps: Ap
     </tr>
     {open && <tr className="matrix-detail"><td id={detailId} colSpan={apps.length + 1}>
       <div className="conn-roles"><RoleHolder label="PM" holder={row.pm} /><RoleHolder label="Director" holder={row.director} /></div>
+      {row.conflicts.length > 0 && <div className="conn-conflict" role="note"><ul>{row.conflicts.map(s => <li key={s.id}>{conflictText(s, ui)}</li>)}</ul><p>{ui.roleConflictHowTo}</p></div>}
       <ul className="conn-chat-list" aria-label={ui.chatList}>{row.sessions.map(s => <li key={s.id} className={`conn-chat conn-${s.connection}`}>
         <div className="conn-chat-head"><AppMark app={s.app} /><strong title={s.cwd}>{s.name}</strong>{s.role && <span className={`badge role-${s.role}`}>{ROLE_LABELS[s.role]}</span>}</div>
         <div className="conn-chat-meta"><StateBadge session={s} /><span>{ui.lastContact} {time(s.lastSeenAt, locale)}</span>{s.worktree && <span className="conn-worktree">{s.worktree}</span>}</div>

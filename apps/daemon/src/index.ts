@@ -33,11 +33,6 @@ const daemon = createDaemon(inbox, board, runner, {
   allowedHosts: (process.env.CREWPIP_ALLOWED_HOSTS ?? "").split(",").map((h) => h.trim()).filter(Boolean),
 });
 
-// Übernimmt Namen (auch nach /rename), Inbox-Sockets und beendete Sessions aus der
-// Session-Registry von Claude Code, auch für Fenster ohne eingerichtete Hooks.
-const registry = new ClaudeRegistryWatcher(inbox.registrySync(), { log: (l) => console.log(l) });
-registry.start();
-
 let refreshing = false;
 async function refreshNames() {
   if (refreshing) return;
@@ -49,9 +44,21 @@ async function refreshNames() {
       board.emit("projects");
       inbox.emit("sessions");
     }
+    // Rollen folgen dem wirksamen Namen, auch dem nativen Titel aus Codex oder Claude Desktop (#28).
+    inbox.syncNameRoles();
+  } catch (e) {
+    console.log(`[namen] Abgleich fehlgeschlagen: ${(e as Error).message}`);
   } finally { refreshing = false; }
 }
-void refreshNames();
+// Erst die nativen Namen lesen, dann Registry und Hooks zulassen: Sonst bekäme beim Start der
+// Chat eine Rolle, dessen Name zufällig zuerst ausgewertet wird, obwohl ein anderer sie
+// ebenfalls beansprucht (#28).
+await refreshNames();
+
+// Übernimmt Namen (auch nach /rename), Inbox-Sockets und beendete Sessions aus der
+// Session-Registry von Claude Code, auch für Fenster ohne eingerichtete Hooks.
+const registry = new ClaudeRegistryWatcher(inbox.registrySync(), { log: (l) => console.log(l) });
+registry.start();
 const nameTimer = setInterval(() => void refreshNames(), 30_000);
 nameTimer.unref();
 

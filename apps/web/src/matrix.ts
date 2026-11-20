@@ -17,6 +17,8 @@ export interface MatrixRow {
   connected: number;
   /** PM oder Director dieser Zeile sind „Ohne Hook“: Post erreicht sie nicht von selbst. */
   alert: boolean;
+  /** Chats, die per Namen PM oder Director beanspruchen, die Rolle aber nicht haben (#28). */
+  conflicts: Session[];
 }
 
 export interface Matrix {
@@ -55,6 +57,7 @@ export function buildMatrix(sessions: Session[], projects: Project[], projectId:
       id, name: g.name, cells, sessions: sorted, pm, director: localDirector ?? director,
       connected: sorted.filter(s => s.connection === "connected").length,
       alert: [pm, localDirector].some(h => h?.connection === "no-hook" || h?.connection === "restart-needed"),
+      conflicts: sorted.filter(s => s.roleConflict),
     };
   }).sort((a, b) => a.name.localeCompare(b.name));
   const present = new Set(rows.flatMap(r => r.sessions.map(s => s.app)));

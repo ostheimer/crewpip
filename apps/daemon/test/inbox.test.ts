@@ -120,17 +120,22 @@ test("Rollen: aus dem Namen abgeleitet, je Projekt nur ein PM, insgesamt ein Dir
 
   const pm1 = inbox.upsertSession({ id: "pm1", app: "claude", cwd: "/p/outbig", name: "PM outbig" });
   assert.equal(pm1.role, "pm");
-  // Ein zweiter PM im selben Projekt löst den ersten ab
+  // Seit #28: Ein zweiter PM-Name im selben Projekt hängt nicht still um, sondern zeigt einen Konflikt.
   inbox.upsertSession({ id: "pm2", app: "claude", cwd: "/p/outbig", name: "PM outbig neu" });
+  assert.equal(inbox.sessions().find((s) => s.id === "pm1")!.role, "pm");
+  assert.equal(inbox.sessions().find((s) => s.id === "pm2")!.role, null);
+  assert.equal(inbox.sessions().find((s) => s.id === "pm2")!.roleConflict?.holderId, "pm1");
+  // Ausdrücklich gesetzt (Dashboard, set_role) löst die neue Vergabe den bisherigen PM ab
+  assert.equal(inbox.setRole("pm2", "pm", "Test").role, "pm");
   assert.equal(inbox.sessions().find((s) => s.id === "pm1")!.role, null);
-  assert.equal(inbox.sessions().find((s) => s.id === "pm2")!.role, "pm");
   // Ein PM in einem anderen Projekt bleibt unberührt
   inbox.upsertSession({ id: "pm3", app: "claude", cwd: "/p/demo-project", name: "PM demo-project" });
   assert.equal(inbox.sessions().find((s) => s.id === "pm2")!.role, "pm");
 
-  // Umbenennen zieht die Rolle nach
-  assert.equal(inbox.renameSession("x", "PM outbig").role, "pm");
-  assert.equal(inbox.sessions().find((s) => s.id === "pm2")!.role, null, "auch beim Umbenennen wird abgelöst");
+  // Umbenennen wertet den Namen neu aus, hängt aber ebenfalls nicht still um
+  assert.equal(inbox.renameSession("x", "PM outbig").role, null);
+  assert.equal(inbox.sessions().find((s) => s.id === "pm2")!.role, "pm");
+  assert.equal(inbox.renameSession("w", "PM crewpip").role, "pm", "freie Rolle wird per Umbenennen vergeben");
   assert.equal(inbox.setRole("x", null).role, null);
 });
 

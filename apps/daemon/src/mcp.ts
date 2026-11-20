@@ -65,6 +65,12 @@ function renderSessions(all: Session[], self: Session | null): string {
           `${s.worktree ? `  worktree=${s.worktree}` : ""}  status=${s.status}  verbindung=${CONNECTION_WORDS[s.connection]}` +
           `  Ziel: ${s.role === "director" ? "director" : s.role === "pm" ? `pm:${s.projectId}` : `session:${s.id}`}`,
       );
+      if (s.roleConflict) {
+        const role = ROLE_LABELS[s.roleConflict.role];
+        lines.push(s.roleConflict.holderLabel
+          ? `      Konflikt: beansprucht ${role} per Namen, die Rolle hat ${s.roleConflict.holderLabel}.`
+          : `      Konflikt: ${role} wird von mehreren Chats per Namen beansprucht und ist deshalb nicht vergeben.`);
+      }
     }
   }
   lines.push(
@@ -73,6 +79,7 @@ function renderSessions(all: Session[], self: Session | null): string {
     "pm:<projekt> und director folgen der Rolle, nicht der Sitzung: Sie erreichen auch den,",
     "der die Rolle erst später übernimmt, und überstehen einen Neustart.",
     "verbindung=ohne-hook, neustart-noetig oder veraltet: Post erreicht diesen Chat nicht von selbst (docs/verbindung.md).",
+    "Konflikt: CrewPip hängt PM oder Director nie still um. Umhängen mit set_role (Inhaber, Director oder PM crewpip) oder im Dashboard.",
   );
   return lines.join("\n");
 }
@@ -207,6 +214,48 @@ export function createMcpServer(
         : "\n\nAchtung: CrewPip kann deine Session nicht eindeutig erkennen, deshalb ist keine mit * markiert. " +
           "Mehrere Chats dieser App arbeiten im selben Verzeichnis; nenne deinen Sitzungsschlüssel in session_key.";
       return { content: [{ type: "text", text: renderSessions(inbox.sessions(), id.certain ? id.session : null) + note }] };
+    }),
+  );
+
+  server.registerTool(
+    "set_role",
+    {
+      title: "Rolle umhängen",
+      description:
+        "Gibt einem Chat die Rolle PM (pm:<projekt>), Director (director) oder Worker, oder nimmt sie ihm (none). " +
+        "Es gibt je Projekt genau einen PM und insgesamt einen Director; der bisherige Inhaber verliert die Rolle, " +
+        "wartende Post an die Rollenadresse geht an den neuen. Erlaubt nur dem aktuellen PM des Projekts " +
+        "(nicht für Director), dem Director und dem PM crewpip. Jede Änderung wird protokolliert. " +
+        "Nur mit Entscheidung des Menschen umhängen und diese im Issue vermerken.",
+      inputSchema: {
+        cwd: cwdParam,
+        session_key: keyParam,
+        session: z.string().min(1).describe('Ziel-Chat als "session:<id>" oder "<id>" (aus list_sessions)'),
+        role: z.enum(["pm", "director", "worker", "none"]),
+      },
+    },
+    guarded(async ({ cwd, session_key, session, role }) => {
+      const self = await me(cwd, session_key);
+      const target = inbox.session(session.replace(/^session:/, ""));
+      const fail = (text: string) => ({ content: [{ type: "text" as const, text }], isError: true });
+      if (!target || target.status === "ended") return fail(`Unbekannte oder beendete Session: ${session}. IDs liefert list_sessions.`);
+      const next = role === "none" ? null : role;
+      if (!inbox.mayAssignRole(self, target, next)) {
+        return fail(
+          `Abgelehnt: ${self.label} darf die Rolle von ${target.label} nicht ändern. Erlaubt sind der aktuelle PM ` +
+            `dieses Projekts (nicht für Director), der Director und der PM crewpip. Bitte einen von ihnen darum.`,
+        );
+      }
+      const before = inbox.sessions().find((s) => s.id !== target.id && next && (next === "pm" || next === "director") && s.role === next && (next === "director" || s.projectId === target.projectId));
+      const after = inbox.setRole(target.id, next, `session:${self.id}`);
+      const address = next === "pm" ? `pm:${after.projectId}` : next === "director" ? "director" : null;
+      const text =
+        `${after.label}: Rolle ${next ? ROLE_LABELS[next] : "keine"}` +
+        (before ? ` (bisher bei ${before.label})` : "") +
+        "." +
+        (address ? ` ${address} erreicht ab jetzt diesen Chat; wartende Post (${after.pending}) bekommt er beim nächsten Turn.` : "") +
+        " Protokolliert.";
+      return { content: [{ type: "text", text }] };
     }),
   );
 

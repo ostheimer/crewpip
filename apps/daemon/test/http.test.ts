@@ -75,7 +75,7 @@ test("MCP: Tools erkennen die Session über cwd, post_message erreicht Projekt u
   const codex = await mcpClient("codex");
   assert.deepEqual((await codex.listTools()).tools.map((t) => t.name).sort(), [
     "claim_task", "create_task", "list_runs", "list_sessions", "list_tasks", "post_message",
-    "read_inbox", "start_run", "stop_run", "update_task", "wait_for_message",
+    "read_inbox", "set_role", "start_run", "stop_run", "update_task", "wait_for_message",
   ]);
 
   const list = text(await codex.callTool({ name: "list_sessions", arguments: { cwd: "/p/example-project" } }));

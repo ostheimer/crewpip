@@ -208,4 +208,22 @@ export const MIGRATIONS: Migration[] = [
       db.exec("CREATE UNIQUE INDEX idx_sessions_mcp_key ON sessions(mcp_key) WHERE mcp_key IS NOT NULL");
     },
   },
+  {
+    id: "0011-rollenwechsel",
+    title: "Protokoll der Rollenwechsel und zuletzt ausgewerteter Name je Session (#28)",
+    up: (db) => {
+      // role_claim: der wirksame Anzeigename, aus dem zuletzt eine Rolle abgeleitet wurde.
+      // Bestehende Rollen bleiben unverändert; NULL heißt nur „noch nicht ausgewertet“.
+      db.exec("ALTER TABLE sessions ADD COLUMN role_claim TEXT");
+      db.exec(`CREATE TABLE role_changes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        role TEXT NOT NULL,
+        project_id TEXT,
+        from_session TEXT,
+        to_session TEXT,
+        actor TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      )`);
+    },
+  },
 ];

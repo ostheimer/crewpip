@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- PM-Rollen zuverlässig vergeben (Issue #28): Die Rolle folgt dem wirksamen Anzeigenamen, auch einem per `/rename` gesetzten Claude-Namen aus dem Registry-Abgleich (Ursache: dieser lief mit `touch: false` und vergab nie eine Rolle) und nativen Codex-/Claude-Desktop-Titeln. Ein Name hängt PM oder Director nie mehr still um; Konflikte stehen in der Projektzeile der Übersicht und in `list_sessions`. Neues MCP-Werkzeug `set_role` (aktueller PM, Director, PM crewpip), Rollenwechsel werden in `role_changes` protokolliert (`GET /api/role-changes`, Migration `0011-rollenwechsel`). Doku in `docs/rollen.md`, `docs/roles.md` und auf der Erklärseite.
 - Chats melden sich selbständig an (Issue #21): Claude-Chats, die laufen und Turns hatten, aber nie einen Hook geschickt haben, stehen jetzt auf „Neustart nötig“ statt auf „Ohne Hook“ (Ursache: Claude Code liest Hooks beim Start; Chats, die vor der Einrichtung liefen, übernahmen sie teils nie, siehe `docs/verbindung.md`). Eine Prozesskette aus einem früheren Prozess derselben Session gilt nicht mehr als Verbindung. Fehlgeschlagene Hook-Aufrufe stehen ohne Inhalte und Token in `~/.crewpip/hook-errors.log`; der Daemon protokolliert abgelehnte und verworfene Hook-Aufrufe.
 - Seitenleiste bei niedrigem Fenster (Issue #14): Projektliste zeigt bei 800 x 600 mindestens sechs Zeilen, die Leiste scrollt als Ganzes, Sprach-/Darstellungsauswahl und Hilfe bleiben erreichbar. Neuer Browser-Test `apps/daemon/test/browser/sidebar-layout.ts`.
 
