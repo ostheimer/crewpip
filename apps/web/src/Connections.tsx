@@ -96,7 +96,7 @@ function StarGraph({ name, sessions, flows }: { name: string; sessions: Session[
 function FlowEnd({ end, projectId, live }: { end: MessageFlow["from"] | MessageFlow["to"]; projectId: string; live: Set<string> }) {
   const { ui } = useBoardLanguage();
   if ("kind" in end && end.kind === "human") return <span className="flow-end"><span className="badge app-human">{ui.person}</span> {end.name}</span>;
-  return <span className="flow-end"><AppMark app={end.app} /> <strong>{end.projectId === projectId ? end.name : `${end.project} / ${end.name}`}</strong>{!live.has(end.id) && <em className="flow-ended"> ({ui.flowEnded})</em>}</span>;
+  return <span className="flow-end"><AppMark app={end.app} /> <strong>{end.projectId === projectId ? end.name : end.label.replace(/^[^·]+ · /, "")}</strong>{!live.has(end.id) && <em className="flow-ended"> ({ui.flowEnded})</em>}</span>;
 }
 
 /**
@@ -111,7 +111,7 @@ export function Connections({ sessions, projects, projectId, flows }: { sessions
   const groups = new Map<string, { name: string; sessions: Session[] }>();
   for (const s of live) {
     if (projectId && s.projectId !== projectId) continue;
-    const g = groups.get(s.projectId) ?? { name: s.project, sessions: [] };
+    const g = groups.get(s.projectId) ?? { name: projects.find(p => p.id === s.projectId)?.name ?? s.project, sessions: [] };
     g.sessions.push(s);
     groups.set(s.projectId, g);
   }

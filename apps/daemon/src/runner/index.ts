@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 import type { DatabaseSync } from "node:sqlite";
-import { RUN_MODES, sessionLabel, type AppKind, type Run, type RunItem, type RunMode, type RunStatus } from "@crewpip/shared";
+import { RUN_MODES, type AppKind, type Run, type RunItem, type RunMode, type RunStatus } from "@crewpip/shared";
 import type { Board } from "../board.js";
 import { RUNNER_APPS, type RunnerApp } from "./apps.js";
 import * as git from "../git.js";
@@ -63,10 +63,7 @@ export class Runner extends EventEmitter<RunnerEvents> {
 
   /** Anzeigename einer Session, ohne Inbox-Abhängigkeit. */
   private labelOf(id: string): string {
-    const r = this.db.prepare("SELECT app, project, worktree, name FROM sessions WHERE id = ?").get(id) as
-      | { app: AppKind; project: string; worktree: string | null; name: string }
-      | undefined;
-    return r ? sessionLabel(r.app, r.project, r.name, r.worktree) : id;
+    return this.board.displayForId(id)?.label ?? id;
   }
 
   constructor(
@@ -307,7 +304,7 @@ export class Runner extends EventEmitter<RunnerEvents> {
     });
 
     this.emit("runs");
-    this.opts.log?.(`[run] #${id} ${o.app} (${o.mode}) in ${cwd}${o.startedBySessionId ? ` — angestoßen von ${this.labelOf(o.startedBySessionId)}` : ""}`);
+    this.opts.log?.(`[run] #${id} ${o.app} (${o.mode}) in ${cwd}${o.startedBySessionId ? " — von einem Chat gestartet" : ""}`);
     return this.toRun(this.row(id));
   }
 

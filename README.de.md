@@ -57,8 +57,14 @@ packages/shared  gemeinsame Typen
 
 Das Subjekt in CrewPip ist die **Session**: ein Chat-Fenster in einer App, erkannt an
 App, Projektordner und Session-ID. Angezeigt wird sie als `Claude · example-project / api-worker`.
-Der Name ist frei wählbar (Web-UI, Stift-Symbol, oder `CREWPIP_SESSION_NAME` im Hook-Umfeld),
-Standard ist die Startzeit.
+CrewPip gleicht die Chat-Titel aus Codex und Claude Code lokal über die Session-ID ab.
+Bei Codex kommen Projektnamen und Chat-Titel aus der lokalen Desktop-Datenbank und dem
+Titelindex. Bei Claude kommen sie aus den Desktop-Metadaten und der CLI-Registry.
+In der Seitenleiste und der mobilen Auswahl öffnet ein eigenständiger Chat seinen
+Nachrichtenverlauf. Ein Projekt mit nativem Namen behält seinen eigenen Eintrag.
+Ruhende und beendete Chats findest du auch über die Suche und „Alle Projekte anzeigen“.
+Explizit vergebene CrewPip-Namen bleiben erhalten. Fehlt eine Quelle, nutzt CrewPip die
+vorhandenen Namen oder die Startzeit. Zustelladressen und Rollen bleiben an ihre IDs gebunden.
 
 Nachrichten gehen an eine Session (`session:<id>`), ein Projekt (`project:<name>`), eine App
 (`app:claude|cursor|codex`), eine **Rolle** (`director`, `pm:<projekt>`), alle (`all`) oder

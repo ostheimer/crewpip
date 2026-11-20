@@ -48,7 +48,7 @@ Chats are never connected to each other directly: each chat is connected to Crew
 
 ## Work with projects and tasks
 
-Opening a chat in a repository registers the project. Chats in Git worktrees are grouped with the main repository. Select a project to see its tasks and registered chats.
+Opening a chat in a repository registers the project. Chats in Git worktrees are grouped with the main repository. Select a project to see its tasks and registered chats. CrewPip reads project aliases and chat titles locally from the Codex desktop database and title index, and chat titles from Claude Desktop metadata or the Claude Code registry. Standalone chats are listed separately by title, even when they share a working folder. Search or expand the project list to find an ended chat and open its message history. Changing a title preserves the mailbox and role.
 
 | Destination | Use it to reach |
 |---|---|

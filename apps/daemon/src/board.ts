@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import {
+  APP_LABELS,
   type AppKind,
   type Project,
   type Task,
@@ -11,7 +12,10 @@ import {
   projectRootOf,
   sessionLabel,
 } from "@crewpip/shared";
+import type { NameIndex } from "./registry/native-names.js";
 import * as git from "./git.js";
+
+type DisplayRow = { id: string; app: AppKind; name: string; name_source: string; project: string; project_id: string | null; worktree: string | null };
 
 export interface BoardEvents {
   tasks: [];
@@ -56,7 +60,7 @@ export class Board extends EventEmitter<BoardEvents> {
   /** cwd -> Repository-Wurzel. Ändert sich zur Laufzeit nie, deshalb dauerhaft gecacht. */
   private readonly rootCache = new Map<string, string>();
 
-  constructor(private readonly db: DatabaseSync) {
+  constructor(private readonly db: DatabaseSync, private readonly names?: NameIndex) {
     super();
   }
 
@@ -100,10 +104,49 @@ export class Board extends EventEmitter<BoardEvents> {
     return id;
   }
 
-  private toProject(r: ProjectRow): Project {
+  private nativeTitle(s: Pick<DisplayRow, "id" | "app" | "name" | "name_source">): string | undefined {
+    const name = this.names?.titles.get(`${s.app}:${s.id}`);
+    if (this.names && s.app === "claude" && (s.name_source === "registry" || s.name_source === "cli-user")) return name ?? s.name;
+    if (this.names && s.app === "claude" && s.name_source === "user") return s.name;
+    return name && s.name_source === "user" ? s.name : name;
+  }
+
+  private standalone(root: string): boolean {
+    // resolveProject normalisiert Worktrees bereits auf die Wurzel des Haupt-Repositories.
+    return !this.names?.projects.has(root) && !fs.existsSync(path.join(root, ".git")) && !(fs.existsSync(path.join(root, "HEAD")) && fs.existsSync(path.join(root, "objects")));
+  }
+
+  displayForId(id: string) {
+    const row = this.db.prepare("SELECT id, app, name, name_source, project, project_id, worktree FROM sessions WHERE id = ?").get(id) as DisplayRow | undefined;
+    return row && this.sessionDisplay(row);
+  }
+
+  sessionDisplay(s: DisplayRow) {
+    const native = this.nativeTitle(s);
+    const name = native ?? s.name;
+    const root = this.names && s.project_id
+      ? this.db.prepare("SELECT root FROM projects WHERE id = ?").get(s.project_id)?.root : undefined;
+    if (typeof root === "string") {
+      if (native && this.standalone(root)) return { name, label: `${APP_LABELS[s.app]} · ${name}` };
+      return { name, label: sessionLabel(s.app, this.names?.projects.get(root) ?? s.project, name, s.worktree) };
+    }
+    return { name, label: sessionLabel(s.app, s.project, name, s.worktree) };
+  }
+
+  private toProject(r: ProjectRow, withChats = false): Project {
     const sessions = this.db.prepare("SELECT COUNT(*) AS n FROM sessions WHERE project_id = ? AND ended_at IS NULL").get(r.id) as { n: number };
     const open = this.db.prepare("SELECT COUNT(*) AS n FROM tasks WHERE project_id = ? AND status IN ('open','claimed','review')").get(r.id) as { n: number };
+    const displayName = this.names?.projects.get(r.root);
+    let standaloneChats: Project["standaloneChats"];
+    if (withChats && this.names && !displayName && this.standalone(r.root)) {
+      const rows = this.db.prepare("SELECT id, app, name, name_source FROM sessions WHERE project_id = ? ORDER BY id").all(r.id) as unknown as
+        Pick<DisplayRow, "id" | "app" | "name" | "name_source">[];
+      if (rows.some(s => this.nativeTitle(s))) {
+        standaloneChats = rows.map(s => ({ id: s.id, app: s.app, name: this.nativeTitle(s) ?? s.name }));
+      }
+    }
     return {
+      ...(displayName ? { displayName } : {}), ...(standaloneChats ? { standaloneChats } : {}),
       id: r.id, name: r.name, root: r.root, bootstrap: r.bootstrap,
       createdAt: r.created_at, archivedAt: r.archived_at, sessions: sessions.n, openTasks: open.n,
     };
@@ -119,7 +162,7 @@ export class Board extends EventEmitter<BoardEvents> {
 
   projects(): Project[] {
     const rows = this.db.prepare("SELECT * FROM projects ORDER BY name").all() as unknown as ProjectRow[];
-    return rows.map((r) => this.toProject(r));
+    return rows.map((r) => this.toProject(r, true));
   }
 
   project(id: string): Project | null {
@@ -143,10 +186,8 @@ export class Board extends EventEmitter<BoardEvents> {
     const project = this.db.prepare("SELECT name FROM projects WHERE id = ?").get(r.project_id) as { name: string } | undefined;
     let assignee: Task["assignee"] = null;
     if (r.assignee_session_id) {
-      const s = this.db
-        .prepare("SELECT id, app, project, worktree, name FROM sessions WHERE id = ?")
-        .get(r.assignee_session_id) as { id: string; app: AppKind; project: string; worktree: string | null; name: string } | undefined;
-      if (s) assignee = { id: s.id, label: sessionLabel(s.app, s.project, s.name, s.worktree) };
+      const display = this.displayForId(r.assignee_session_id);
+      if (display) assignee = { id: r.assignee_session_id, label: display.label };
     }
     return {
       id: r.id,

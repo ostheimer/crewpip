@@ -110,6 +110,10 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
 
 /** Ein Repository, in dem gearbeitet wird. Wurzel ist das Haupt-Repository, nie ein Worktree. */
 export interface Project {
+  /** Nativer Projektname. name bleibt die unveränderte CrewPip-Adresse. */
+  displayName?: string;
+  /** Einzelne native Chats in einem Arbeitsordner ohne eigenes App-Projekt. */
+  standaloneChats?: { id: string; name: string; app: AppKind }[];
   id: string;
   name: string;
   root: string;

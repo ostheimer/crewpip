@@ -1,6 +1,10 @@
 import type { de } from "./de.ts";
 
 export const en = {
+  projectsAndChats: "Projects and chats",
+  allEntryCount: (n: number) => `Show all ${n} entries`,
+  noNativeProject: "Chats without a project",
+  writeChat: "Message chat",
   person: "Person",
   to: "To",
   expandMessage: "Expand message",

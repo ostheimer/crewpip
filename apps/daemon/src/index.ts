@@ -7,6 +7,8 @@ import { Inbox } from "./inbox.js";
 import { Board } from "./board.js";
 import { Runner } from "./runner/index.js";
 import { createDaemon } from "./http.js";
+import { NativeNames } from "./registry/native-names.js";
+import type { AppKind } from "@crewpip/shared";
 import { ClaudeRegistryWatcher, registryDir } from "./registry/claude.js";
 import { loadOrCreateToken, tokenPath } from "./auth.js";
 
@@ -14,7 +16,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const webDist = path.resolve(here, "../../web/dist");
 
 const db = openDb(config.dbPath, { log: (l) => console.log(l) });
-const board = new Board(db);
+const names = new NativeNames();
+const board = new Board(db, names);
 const inbox = new Inbox(db, board);
 const runner = new Runner(db, board, {
   logDir: path.join(path.dirname(config.dbPath), "runs"),
@@ -35,6 +38,22 @@ const daemon = createDaemon(inbox, board, runner, {
 const registry = new ClaudeRegistryWatcher(inbox.registrySync(), { log: (l) => console.log(l) });
 registry.start();
 
+let refreshing = false;
+async function refreshNames() {
+  if (refreshing) return;
+  refreshing = true;
+  try {
+    const known = db.prepare("SELECT id, app FROM sessions WHERE app IN ('codex', 'claude')").all() as unknown as { id: string; app: AppKind }[];
+    if (await names.refresh(known)) {
+      board.emit("projects");
+      inbox.emit("sessions");
+    }
+  } finally { refreshing = false; }
+}
+void refreshNames();
+const nameTimer = setInterval(() => void refreshNames(), 30_000);
+nameTimer.unref();
+
 daemon.server.listen(config.port, config.host, () => {
   console.log(`crewpip-daemon läuft auf ${baseUrl()}  (DB: ${config.dbPath})`);
   console.log(`  MCP:   ${baseUrl()}/mcp/<app>`);
@@ -46,6 +65,7 @@ daemon.server.listen(config.port, config.host, () => {
 
 for (const sig of ["SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
+    clearInterval(nameTimer);
     registry.stop();
     runner.stopAll();
     daemon.close().then(() => process.exit(0));

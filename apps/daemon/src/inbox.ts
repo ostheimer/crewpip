@@ -70,8 +70,8 @@ interface MessageRow {
 const HUMAN_NAME = /^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,63}$/u;
 
 /** Woher der Anzeigename stammt. Ein stärkerer Wert wird nie von einem schwächeren überschrieben. */
-export type NameSource = "auto" | "registry" | "user";
-const NAME_RANK: Record<NameSource, number> = { auto: 0, registry: 1, user: 2 };
+export type NameSource = "auto" | "registry" | "cli-user" | "user";
+const NAME_RANK: Record<NameSource, number> = { auto: 0, registry: 1, "cli-user": 2, user: 2 };
 
 /** Sessions, die nur über einen MCP-Aufruf bekannt sind, weil kein Hook sie angemeldet hat. */
 const PLACEHOLDER_PREFIX = "mcp-";
@@ -189,8 +189,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
       project: r.project,
       worktree: r.worktree,
       cwd: r.cwd,
-      name: r.name,
-      label: sessionLabel(r.app, r.project, r.name, r.worktree),
+      ...this.board.sessionDisplay(r),
       status: r.ended_at ? "ended" : r.status,
       connection: connectionOf(r),
       startedAt: r.started_at,
@@ -207,8 +206,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
   }
 
   labelOf(id: string): string | null {
-    const r = this.sessionRow(id);
-    return r ? sessionLabel(r.app, r.project, r.name, r.worktree) : null;
+    return this.board.displayForId(id)?.label ?? null;
   }
 
   /** Session anlegen oder auffrischen. Ein späterer Aufruf ohne Socket überschreibt den Socket nicht. */
@@ -288,7 +286,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
           cwd: e.cwd,
           name: e.name,
           // Nur ein per /rename gesetzter Name gilt als ausdrücklicher Wunsch.
-          nameSource: e.nameSource === "user" ? "user" : "registry",
+          nameSource: e.nameSource === "user" ? "cli-user" : "registry",
           pid: e.pid,
           startedAt: e.startedAt,
           touch: false,
@@ -478,18 +476,19 @@ export class Inbox extends EventEmitter<InboxEvents> {
   // ---- Nachrichten --------------------------------------------------------
 
   private toMessage(r: MessageRow): Message {
+    const display = r.from_kind === "session" ? this.board.displayForId(r.from_id) : undefined;
     const from: Party =
       r.from_kind === "session"
-        ? { kind: "session", id: r.from_id, app: r.from_app ?? "other", project: r.from_project ?? "", worktree: r.from_worktree, name: r.from_name, label: sessionLabel(r.from_app ?? "other", r.from_project ?? "", r.from_name, r.from_worktree), role: roleFromName(r.from_name) }
+        ? { kind: "session", id: r.from_id, app: r.from_app ?? "other", project: r.from_project ?? "", worktree: r.from_worktree, name: display?.name ?? r.from_name, label: display?.label ?? sessionLabel(r.from_app ?? "other", r.from_project ?? "", r.from_name, r.from_worktree), role: roleFromName(r.from_name) }
         : { kind: "human", name: r.from_name, label: r.from_name };
     const to = parseTarget(r.to_target);
     const deliveries = (
-      this.db.prepare("SELECT d.session_id, d.method, d.at, s.app, s.project, s.worktree, s.name FROM deliveries d JOIN sessions s ON s.id = d.session_id WHERE d.message_id = ? ORDER BY d.at").all(r.id) as unknown as {
-        session_id: string; method: DeliveryMethod; at: string; app: AppKind; project: string; worktree: string | null; name: string;
+      this.db.prepare("SELECT d.session_id, d.method, d.at, s.app, s.project, s.project_id, s.worktree, s.name, s.name_source FROM deliveries d JOIN sessions s ON s.id = d.session_id WHERE d.message_id = ? ORDER BY d.at").all(r.id) as unknown as {
+        session_id: string; method: DeliveryMethod; at: string; app: AppKind; project: string; project_id: string; worktree: string | null; name: string; name_source: string;
       }[]
-    ).map((d) => ({ sessionId: d.session_id, sessionLabel: sessionLabel(d.app, d.project, d.name, d.worktree), method: d.method, at: d.at }));
+    ).map((d) => ({ sessionId: d.session_id, sessionLabel: this.board.sessionDisplay({ ...d, id: d.session_id }).label, method: d.method, at: d.at }));
     const delivered = new Set(deliveries.map((d) => d.sessionId));
-    const pending = this.targetSessions(r).filter((s) => !delivered.has(s.id)).map((s) => sessionLabel(s.app, s.project, s.name, s.worktree));
+    const pending = this.targetSessions(r).filter((s) => !delivered.has(s.id)).map((s) => this.board.sessionDisplay(s).label);
     return {
       id: r.id,
       from,
@@ -640,7 +639,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
       .all(since) as unknown as { from_kind: "session" | "human"; from_id: string; session_id: string; n: number; last_at: string }[];
     const end = (id: string): FlowSession | null => {
       const r = this.sessionRow(id);
-      return r ? { id: r.id, app: r.app, projectId: r.project_id ?? "", project: r.project, name: r.name, label: sessionLabel(r.app, r.project, r.name, r.worktree) } : null;
+      return r ? { id: r.id, app: r.app, projectId: r.project_id ?? "", project: r.project, ...this.board.sessionDisplay(r) } : null;
     };
     const flows: MessageFlow[] = [];
     for (const r of rows) {

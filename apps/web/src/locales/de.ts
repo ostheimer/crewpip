@@ -1,6 +1,10 @@
 import { TASK_STATUS_LABELS, RUN_MODE_LABELS, RUN_STATUS_LABELS, DELIVERY_LABELS } from "@crewpip/shared";
 
 export const de = {
+  projectsAndChats: "Projekte und Chats",
+  allEntryCount: (n: number) => `Alle ${n} Einträge anzeigen`,
+  noNativeProject: "Chats ohne Projekt",
+  writeChat: "Chat schreiben",
   person: "Person",
   to: "An",
   expandMessage: "Meldung aufklappen",
