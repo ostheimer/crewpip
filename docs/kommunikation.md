@@ -77,6 +77,7 @@ genaue Regel steht in [verbindung.md](verbindung.md).
 |---|---|
 | Post kommt an | Mit CrewPip verbunden: Der Hook hat sich gemeldet und das Programm läuft. Post kommt beim nächsten Turn an, auch wenn der Chat gerade ruht. |
 | Ohne Hook | CrewPip kennt den Chat, aber sein Hook hat sich noch nie gemeldet. Ob Post von selbst ankommt, ist offen; sicher abholen kann der Chat sie mit `read_inbox` oder `wait_for_message`. |
+| Neustart nötig | Der Chat läuft und hatte seit seinem Start mindestens einen Turn, aber von ihm kam nie ein Hook. Er hat die CrewPip-Hooks nicht geladen, meist weil er schon lief, als sie eingerichtet wurden. Erst ein Neustart des Chats verbindet ihn. |
 | Veraltet | Das Programm des Chats läuft nicht mehr. Der Eintrag ist liegen geblieben. |
 | Beendet | Ausgetragen. Erscheint nicht mehr als Chat in der Übersicht; seine Nachrichtenwege der letzten 24 Stunden bleiben mit dem Vermerk „beendet“ in der Liste. |
 
@@ -87,7 +88,11 @@ genaue Regel steht in [verbindung.md](verbindung.md).
    ausführen und die vier CrewPip-Hooks freigeben. Bei Antigravity gehören sie in
    `~/.gemini/config/hooks.json`, die MCP-Verbindung in `~/.gemini/config/mcp_config.json`.
 3. Den Chat neu starten und einen Prompt eingeben (Cursor: einen neuen Chat beginnen). Danach
-   steht er auf „Post kommt an“.
+   steht er auf „Post kommt an“. Dasselbe gilt für „Neustart nötig“: Claude Code liest Hooks
+   beim Start eines Chats.
+
+Warum ein Hook-Aufruf scheiterte (Daemon nicht erreichbar, Token abgelehnt, Eingabe ohne
+Sitzungs-ID), steht je Aufruf in `~/.crewpip/hook-errors.log`, ohne Inhalte und ohne Token.
 
 ## Übersicht im Board
 

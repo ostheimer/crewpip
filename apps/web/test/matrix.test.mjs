@@ -66,7 +66,7 @@ for (const [language, title, labels] of [
       assert.equal((html.match(/<th scope="col"><span class="app-mark/g) ?? []).length, 4, "eine Spalte je vorkommender App");
       // Ein Symbol je Chat, Zustand als Form (data-state) und im Namen, nicht nur als Farbe.
       assert.equal((html.match(/data-chat="/g) ?? []).length, sessions.length);
-      for (const state of ["connected", "no-hook", "stale"]) assert.ok(html.includes(`data-state="${state}"`), state);
+      for (const state of ["connected", "no-hook", "restart-needed", "stale"]) assert.ok(html.includes(`data-state="${state}"`), state);
       assert.ok(html.includes(`aria-label="PM shop-api, Claude, PM, ${labels.noHook}"`), "Name, App, Rolle, Zustand am Symbol");
       assert.ok(html.includes(">PM</span>") && html.includes(">D</span>"), "Kürzel für PM und Director");
       assert.ok(html.includes("matrix-alert"), "Zeile mit PM ohne Hook hervorgehoben");

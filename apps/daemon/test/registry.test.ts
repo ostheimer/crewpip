@@ -38,6 +38,8 @@ test("readClaudeRegistry liest lebende Einträge und lässt tote sowie kaputte a
     name: "crewpip-55",
     nameSource: "derived",
     startedAt: new Date(1788354767832).toISOString(),
+    status: null,
+    statusAt: null,
   });
   assert.deepEqual(readClaudeRegistry(path.join(dir, "gibts-nicht")), [], "fehlendes Verzeichnis ist kein Fehler");
 });

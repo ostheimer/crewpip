@@ -32,7 +32,7 @@ export const sessions = [
   session("billing", "claude", "PM billing", "connected", "pm"),
   session("billing", "codex", "#3 Mahnungen", "no-hook"),
   session("mobile-app", "cursor", "ios-build", "connected"),
-  session("infra", "claude", "PM infra", "connected", "pm"),
+  session("infra", "claude", "PM infra", "restart-needed", "pm"),
   session("data-pipeline", "codex", "#9 Import", "connected"),
   session("auth-service", "claude", "PM auth-service", "connected", "pm"),
   session("landing", "claude", "#2 Texte", "stale", null, { ago: 3000 }),

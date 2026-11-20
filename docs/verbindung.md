@@ -1,7 +1,7 @@
 # Wann ein Chat als verbunden gilt
 
 Das Dashboard zeigt unter „Chats an CrewPip“ je Repo jeden eingetragenen Chat mit einem von
-vier Zuständen. Die Regel steht in `connectionOf` (`apps/daemon/src/inbox.ts`) und ist in
+fünf Zuständen. Die Regel steht in `connectionOf` (`apps/daemon/src/inbox.ts`) und ist in
 `apps/daemon/test/connection.test.ts` getestet. Das MCP-Werkzeug `list_sessions` nennt
 denselben Zustand als `verbindung=…`.
 
@@ -9,6 +9,7 @@ denselben Zustand als `verbindung=…`.
 | --- | --- | --- |
 | Post kommt an (`connected`) | nicht ausgetragen, der Hook hat sich mindestens einmal gemeldet, der Agent-Prozess läuft | Post kommt beim nächsten Turn an, auch wenn der Chat gerade ruht. |
 | Ohne Hook (`no-hook`) | eingetragen, aber nie über den Hook gemeldet (nur Claude-Registry oder nur MCP-Aufruf) | CrewPip kennt den Chat, aber ob Post von selbst ankommt, ist offen. Meldet sich der Hook auch nach dem nächsten Turn nicht, Chat neu starten oder Einrichtung prüfen. |
+| Neustart nötig (`restart-needed`) | Claude: der Prozess läuft, hat seit seinem Start mindestens einen Turn beendet (Registry `status` = `idle`, letzte Statusänderung mindestens 10 s nach dem Start und mindestens 10 s her), aber kein Hook kam aus diesem Prozess | Der Chat hat die CrewPip-Hooks nicht geladen. Nur ein Neustart des Chats hilft (siehe unten). |
 | Veraltet (`stale`) | der Agent-Prozess läuft nicht mehr, der Eintrag ist aber offen | Liegen gebliebener Eintrag. |
 | Beendet (`ended`) | ausgetragen (SessionEnd, Claude-Registry, Platzhalter abgelöst oder von Hand) | erscheint nicht in der Übersicht. |
 
@@ -17,6 +18,15 @@ denselben Zustand als `verbindung=…`.
 - **Hook gemeldet:** Bei jedem Hook-Aufruf ermittelt der Daemon die Prozesskette über dem Hook
   und speichert sie (`proc_chain`), solange keine lebende bekannt ist. Eine gespeicherte Kette
   gibt es nur über den Hook-Weg.
+- **Hook aus dem laufenden Prozess:** Bei Claude zählt die Kette nur, wenn sie die PID aus der
+  Registry enthält. Die Desktop-App setzt eine Session nach einem Neustart mit derselben ID in
+  einem neuen Prozess fort; eine Kette des alten Prozesses belegt dann keine Verbindung mehr,
+  und der nächste Hook ermittelt sie neu.
+- **Turn ohne Hook:** Die Registry nennt je Prozess `status` (`busy` im Turn, sonst `idle`) und
+  `statusUpdatedAt`. Ein geladener Stop-Hook meldet sich am Ende jedes Turns; ist ein Turn seit
+  mindestens 10 s vorbei und kam trotzdem nie ein Hook aus dem Prozess, hat er die Hooks nicht
+  geladen. Fehlen die Felder
+  (ältere Claude-Version), bleibt es bei „Ohne Hook“.
 - **Prozess lebt:** Für Claude Code die PID aus der Registry `~/.claude/sessions`, sonst der
   Agent an der Spitze der Prozesskette (bei Codex der gemeinsame `codex`-Prozess der
   ChatGPT-App, bei Antigravity der gemeinsame `language_server` der App). Geprüft mit
@@ -45,3 +55,28 @@ geprüft ist bisher nur die App.
 
 Das Dashboard holt die Sitzungen zusätzlich alle 30 Sekunden neu, weil das Ende eines
 Prozesses kein Ereignis auslöst.
+
+## Warum ein Neustart nötig sein kann (#21)
+
+Claude Code liest die Hook-Liste beim Start eines Chat-Prozesses. Ändert sich
+`~/.claude/settings.json` später, übernehmen laufende Prozesse das nicht verlässlich. Belegt am
+19./20.11.2026: Die CrewPip-Hooks kamen am 19.11. gegen 13:55 UTC in die Einstellungen (die
+Sicherung der Einrichtung von 14:18 Ortszeit hat noch keinen `hooks`-Block). In den
+Transkripten zeigt die Stop-Hook-Zusammenfassung (`stop_hook_summary`) vorher bei allen Chats
+5 Hooks, danach bei neu gestarteten 6. Von 21 Chats, die schon liefen, hatten 11 den
+CrewPip-Hook später (einige erst nach einem Neustart ihres Prozesses), 10 nie, darunter Director, PM CMM und PM firmenwebseiten.at. Diese Chats
+hatten Turns, aber CrewPip hat nie einen Hook-Aufruf von ihnen bekommen. Erst ein neuer Prozess
+(Chat schließen und wieder öffnen) lädt die Hooks.
+
+CrewPip kann einem laufenden Prozess keine Hooks nachreichen. Das Dashboard zeigt solche Chats
+deshalb als „Neustart nötig“.
+
+## Fehlgeschlagene Hook-Aufrufe
+
+Das Hook-Skript schreibt jeden fehlgeschlagenen Aufruf als eine Zeile nach
+`~/.crewpip/hook-errors.log` (änderbar über `CREWPIP_HOOK_ERROR_LOG`): Zeit, App, Ereignis,
+Sitzungs-ID, Verzeichnis und Grund (z. B. `fetch failed (ECONNREFUSED)`, `Daemon antwortete 401`,
+`Zeitlimit überschritten`, `Eingabe ohne Sitzungs-ID`). Prompts, Antworten und das Token stehen
+nie darin. Ab 256 KB wird die Datei nach `hook-errors.log.1` verschoben. Der Daemon protokolliert
+zusätzlich in `~/.crewpip/daemon.log`, wenn er einen Hook-Aufruf wegen fehlendem oder falschem
+Token ablehnt oder ihn ohne Sitzungs-ID oder Verzeichnis verwirft.

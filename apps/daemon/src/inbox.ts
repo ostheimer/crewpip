@@ -133,8 +133,8 @@ export interface ProcActivity {
 
 /**
  * Abstand, der zwischen Prozessstart, Turn-Ende und Bewertung mindestens liegen muss, damit
- * ein fehlender Hook als „Neustart nötig“ gilt. Der Stop-Hook läuft vor dem Statuswechsel auf
- * "idle"; die Frist deckt seinen Weg zum Daemon (Zeitlimit 5 s) und das Ermitteln der
+ * ein fehlender Hook als „Neustart nötig“ gilt. Ein geladener Stop-Hook meldet sich am Ende
+ * jedes Turns; die Frist deckt seinen Weg zum Daemon (Zeitlimit 5 s) und das Ermitteln der
  * Prozesskette ab.
  */
 export const HOOK_GRACE_MS = 10_000;

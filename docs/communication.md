@@ -76,6 +76,7 @@ is documented in [verbindung.md](verbindung.md) (German).
 |---|---|
 | Messages arrive | Connected to CrewPip: the hook has reported and the app is running. Messages arrive at the next turn, even while the chat is idle. |
 | Without hook | CrewPip knows the chat, but its hook has never reported. Whether messages arrive on their own is uncertain; the chat can always fetch them with `read_inbox` or `wait_for_message`. |
+| Restart needed | The chat is running and has had at least one turn since it started, but its hook never reported. It did not load the CrewPip hooks, usually because it was already running when they were set up. Only a restart of the chat connects it. |
 | Stale | The chat's app is no longer running. The entry was left behind. |
 | Ended | Unregistered. No longer shown as a chat in the overview; its message paths from the last 24 hours stay in the list, marked “ended”. |
 
@@ -85,7 +86,11 @@ Fixing “Without hook”:
 2. Copy the hook entries for the app from `config/generated/`. For Codex, run `/hooks`
    afterwards and approve the four CrewPip hooks. For Antigravity they go into
    `~/.gemini/config/hooks.json`, the MCP connection into `~/.gemini/config/mcp_config.json`.
-3. Restart the chat and enter a prompt (Cursor: start a new chat). It then shows “Messages arrive”.
+3. Restart the chat and enter a prompt (Cursor: start a new chat). It then shows “Messages arrive”. The same applies to
+   “Restart needed”: Claude Code reads hooks when a chat starts.
+
+Why a hook call failed (daemon unreachable, token rejected, input without a session ID) is
+recorded per call in `~/.crewpip/hook-errors.log`, without contents and without the token.
 
 ## Overview on the board
 

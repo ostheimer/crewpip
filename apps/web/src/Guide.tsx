@@ -3,7 +3,7 @@ import { ArrowRight } from "lucide-react";
 import type { ConnectionState } from "@crewpip/shared";
 import { useBoardLanguage } from "./language.tsx";
 
-const STATES: ConnectionState[] = ["connected", "no-hook", "stale", "ended"];
+const STATES: ConnectionState[] = ["connected", "no-hook", "restart-needed", "stale", "ended"];
 
 /** `code` in Erklärtexten als <code> ausgeben, sonst reiner Text. */
 export function Rich({ text }: { text: string }) {
