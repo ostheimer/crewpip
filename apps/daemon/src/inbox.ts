@@ -229,6 +229,11 @@ export function targetLabel(t: Target, resolveSession?: (id: string) => string |
 export class Inbox extends EventEmitter<InboxEvents> {
   /** Prozesszustand je Claude-Session laut Registry; siehe ProcActivity. */
   private readonly activity = new Map<string, ProcActivity>();
+  /**
+   * Letzter Hook-Aufruf je Session (nur im Speicher). Ein angekommener Hook beweist, dass der
+   * Prozess die Hooks geladen hat, auch wenn sich seine Prozesskette nicht ermitteln ließ.
+   */
+  private readonly hookAt = new Map<string, string>();
 
   constructor(
     private readonly db: DatabaseSync,
@@ -253,7 +258,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
       cwd: r.cwd,
       ...this.board.sessionDisplay(r),
       status: r.ended_at ? "ended" : r.status,
-      connection: connectionOf(r, undefined, this.activity.get(r.id)),
+      connection: connectionOf(r, undefined, this.activityWithoutHook(r.id)),
       startedAt: r.started_at,
       lastSeenAt: r.last_seen_at,
       endedAt: r.ended_at,
@@ -265,6 +270,19 @@ export class Inbox extends EventEmitter<InboxEvents> {
         return t ? { id: t.id, title: t.title, status: t.status } : null;
       })(),
     };
+  }
+
+  /** Registry-Zustand des Prozesses, sofern seit dessen Start kein Hook von der Session kam. */
+  private activityWithoutHook(id: string): ProcActivity | undefined {
+    const a = this.activity.get(id);
+    const heard = this.hookAt.get(id);
+    if (a && heard && a.startedAt && heard >= a.startedAt) return undefined;
+    return a;
+  }
+
+  /** Vom Hook-Endpunkt bei jedem Aufruf gemeldet. */
+  noteHook(id: string): void {
+    this.hookAt.set(id, new Date().toISOString());
   }
 
   labelOf(id: string): string | null {
@@ -385,6 +403,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
 
   endSession(id: string): void {
     this.activity.delete(id);
+    this.hookAt.delete(id);
     this.db.prepare("UPDATE sessions SET ended_at = ?, status = 'ended' WHERE id = ? AND ended_at IS NULL").run(new Date().toISOString(), id);
     this.emit("sessions");
   }

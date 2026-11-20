@@ -71,6 +71,12 @@ hatten Turns, aber CrewPip hat nie einen Hook-Aufruf von ihnen bekommen. Erst ei
 CrewPip kann einem laufenden Prozess keine Hooks nachreichen. Das Dashboard zeigt solche Chats
 deshalb als „Neustart nötig“.
 
+Grenzen der Erkennung: Ein Hook, der ankommt, verhindert „Neustart nötig“ für den laufenden
+Prozess auch dann, wenn sich seine Prozesskette nicht ermitteln ließ; diese Merkung lebt nur im
+Speicher des Daemons. Ob Claude Code den Registry-Status auch bei lokalen Befehlen ohne Stop-Hook
+(etwa `/compact`) wechselt, ist nicht geprüft; ein solcher Wechsel allein könnte einen Chat
+fälschlich als „Neustart nötig“ zeigen, bis der nächste Turn einen Hook schickt.
+
 ## Fehlgeschlagene Hook-Aufrufe
 
 Das Hook-Skript schreibt jeden fehlgeschlagenen Aufruf als eine Zeile nach

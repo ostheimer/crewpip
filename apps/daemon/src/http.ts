@@ -118,6 +118,7 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
       status: event === "prompt" ? "working" : event === "stop" ? "idle" : undefined,
     });
     response.session = { id: session.id, label: session.label };
+    inbox.noteHook(session.id);
 
     // Der Hook läuft als Kind des Agenten. Wer über ihm steht, ist der Prozess, der später
     // die MCP-Aufrufe dieser Session macht. Gesucht wird nur, wenn nichts Lebendes bekannt
