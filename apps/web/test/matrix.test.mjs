@@ -76,7 +76,8 @@ for (const [language, title, labels] of [
       assert.equal(html.includes("conn-graph"), false);
       assert.equal(html.includes(copy.connectionsIntro), false, "Erklärtext sichtbar statt hinter dem Info-Knopf");
       assert.ok(html.includes(`aria-label="${copy.matrixInfoLabel}"`) && html.includes('aria-expanded="false"'));
-      assert.equal((html.match(/aria-expanded="false" aria-controls="repo-/g) ?? []).length, 14);
+      assert.equal((html.match(/class="repo-toggle" aria-expanded="false"/g) ?? []).length, 14, "alle Zeilen zugeklappt");
+      assert.equal(html.includes("aria-controls=\"repo-"), false, "aria-controls erst, wenn der Bereich existiert");
       for (const l of Object.values(labels)) assert.ok(html.includes(l), `Legende nennt ${l}`);
       assert.ok(html.includes("archiv-demo"), "Repo ohne Chat bleibt genannt");
     });
