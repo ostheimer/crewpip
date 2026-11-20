@@ -321,8 +321,9 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
     res.json(inbox.flows(new Date(Date.now() - hours * 3600000).toISOString()));
   });
   app.get("/api/messages", (req, res) => {
-    const limit = Math.min(Number(req.query.limit ?? 200), 1000);
-    res.json(inbox.recent(limit));
+    const n = Number(req.query.limit ?? 200);
+    const limit = Number.isFinite(n) ? Math.min(Math.max(Math.trunc(n), 0), 1000) : 200;
+    res.json(typeof req.query.session === "string" ? inbox.recentFor(req.query.session, limit) : inbox.recent(limit));
   });
   app.post("/api/messages", (req, res) => {
     const { from, to, text } = (req.body ?? {}) as Partial<{ from: string; to: string; text: string }>;

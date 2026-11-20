@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, BookOpen, CheckCheck, Cog, CircleHelp, Folder, LayoutDashboard, ListTodo, MessageSquare, Search, Send, Radio, ChevronRight, Plus } from "lucide-react";
-import { APP_LABELS, ROLE_LABELS, SESSION_ROLES, type AppKind, type Message, type MessageFlow, type Project, type Run, type RunItem, type Session, type Task, type WsEvent } from "@crewpip/shared";
+import { ROLE_LABELS, SESSION_ROLES, type AppKind, type Message, type MessageFlow, type Project, type Run, type RunItem, type Session, type Task, type WsEvent } from "@crewpip/shared";
 import { LanguageProvider, recipientLabel, useBoardLanguage } from "./language.tsx";
 import { displayError } from "./errors.ts";
 import { api, ConnectionError, wsUrl } from "./api.ts";
@@ -46,6 +46,7 @@ function Board() {
   const { theme, chooseTheme } = useTheme();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [chatHistory, setChatHistory] = useState<{ id: string; messages: Message[] } | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [view, setView] = useState<View>("overview");
@@ -75,14 +76,29 @@ function Board() {
     let closed = false;
     let flowTimer: ReturnType<typeof setTimeout> | undefined;
     let flowSeq = 0;
+    let messageTimer: ReturnType<typeof setTimeout> | undefined;
+    let messageSeq = 0;
+    function refreshMessages() {
+      const seq = ++messageSeq;
+      clearTimeout(messageTimer);
+      messageTimer = setTimeout(async () => {
+        try {
+          const res = await api("/api/messages");
+          if (!res.ok) return;
+          const rows = await res.json();
+          if (!closed && seq === messageSeq) setMessages(rows);
+        } catch { /* Die Verbindung lädt den letzten Stand beim nächsten Kontakt. */ }
+      }, 100);
+    }
     let ws: WebSocket | null = null;
     let retry: ReturnType<typeof setTimeout>;
     async function refresh() {
       const seq = ++flowSeq;
+      const msgSeq = ++messageSeq;
       try {
         const urls = ["/api/messages", "/api/sessions", "/api/tasks?status=open,claimed,review,done,cancelled", "/api/projects", "/api/runs", "/api/flows"];
         const [m, s, t, p, r, f] = await Promise.all(urls.map(async url => { const res = await api(url); if (!res.ok) throw new Error(`Daten konnten nicht geladen werden (${res.status}).`); return res.json(); }));
-        if (!closed) { setMessages(m); setSessions(s); setTasks(t); setProjects(p); setRuns(r); if (seq === flowSeq) setFlows(f); setLoaded(true); }
+        if (!closed) { if (msgSeq === messageSeq) setMessages(m); setSessions(s); setTasks(t); setProjects(p); setRuns(r); if (seq === flowSeq) setFlows(f); setLoaded(true); }
       } catch (e) { if (!closed) setError(`${e instanceof Error ? e.message : "Verbindung fehlgeschlagen."} Bitte die Seite neu laden.`); }
     }
     // Nachrichtenwege der letzten 24 Stunden: neu holen bei jeder Zustellung und beim Abgleich.
@@ -102,14 +118,13 @@ function Board() {
       ws.onclose = () => { setConnected(false); if (!closed) retry = setTimeout(connect, 2000); };
       ws.onmessage = ev => {
         const e = JSON.parse(ev.data) as WsEvent;
-        if (e.type === "message") setMessages(m => m.some(x => x.id === e.message.id) ? m : [...m, e.message]);
+        if (e.type === "message") { setMessages(m => m.some(x => x.id === e.message.id) ? m : [...m, e.message]); refreshMessages(); }
         if (e.type === "sessions") setSessions(e.sessions);
         if (e.type === "tasks") setTasks(e.tasks);
-        if (e.type === "projects") setProjects(e.projects);
+        if (e.type === "projects") { setProjects(e.projects); refreshMessages(); }
         if (e.type === "runs") setRuns(e.runs);
         if (e.type === "run-item") setLiveItems(m => ({ ...m, [e.runId]: [...(m[e.runId] ?? []), e.item] }));
-        if (e.type === "delivery") loadFlows();
-        if (e.type === "delivery") setMessages(m => m.map(x => x.id !== e.messageId || x.deliveries.some(d => d.sessionId === e.delivery.sessionId) ? x : { ...x, deliveries: [...x.deliveries, e.delivery], pending: x.pending.filter(p => p !== e.delivery.sessionLabel) }));
+        if (e.type === "delivery") { loadFlows(); refreshMessages(); }
       };
     };
     // Ob ein Chat-Programm noch läuft, meldet niemand von sich aus. Deshalb die Sitzungen
@@ -119,7 +134,7 @@ function Board() {
       loadFlows();
     }, 30000);
     void refresh(); connect();
-    return () => { closed = true; clearTimeout(retry); clearTimeout(flowTimer); clearInterval(poll); ws?.close(); };
+    return () => { closed = true; clearTimeout(retry); clearTimeout(flowTimer); clearTimeout(messageTimer); clearInterval(poll); ws?.close(); };
   }, []);
   // CLI sign-in probes can take seconds. Do not block the overview on them.
   useEffect(() => {
@@ -133,6 +148,27 @@ function Board() {
   const entry = entries.find(e => e.key === selection);
   const projectId = entry?.project.id ?? selection;
   const chatId = entry?.chatId;
+  useEffect(() => {
+    if (!chatId) return;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api(`/api/messages?session=${encodeURIComponent(chatId)}&limit=200`, { signal: controller.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const rows: Message[] = await res.json();
+        if (!controller.signal.aborted) setChatHistory({ id: chatId, messages: rows });
+      } catch {
+        if (!controller.signal.aborted) setError(ui.historyLoadError);
+      }
+    }, 50);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [chatId, messages, sessions, ui.historyLoadError]);
+  const projectAddresses = useMemo(() => {
+    const ids = new Map<string, string | null>();
+    for (const p of projects) ids.set(p.name, ids.has(p.name) ? null : p.id);
+    for (const p of projects) ids.set(p.id, p.id);
+    return ids;
+  }, [projects]);
   const selected = entry?.project ?? projects.find(p => p.id === projectId);
   const selectedTitle = entry?.name ?? (selected && projectTitle(selected, ui.noNativeProject));
   const hasStandalone = entries.some(e => e.chatId);
@@ -149,13 +185,14 @@ function Board() {
   const review = openTasks.filter(t => t.status === "review");
   const activeRuns = runs.filter(r => r.status === "running" && (!projectId || r.projectId === projectId));
   const directors = sessions.filter(s => s.role === "director" && s.status !== "ended");
-  const relevant = useMemo(() => messages.filter(m => chatId
-    ? (m.from.kind === "session" && m.from.id === chatId) || (m.to.kind === "session" && m.to.id === chatId) || m.deliveries.some(d => d.sessionId === chatId)
-    : !selected ||
-    (m.from.kind === "session" && m.from.project === selected.name) ||
-    (m.to.kind === "project" && m.to.name === selected.name) || (m.to.kind === "pm" && m.to.project === selected.name) ||
-    (m.to.kind === "session" && sessions.some(s => m.to.kind === "session" && s.id === m.to.id && s.projectId === selected.id))
-  ).sort((a, b) => b.id - a.id), [messages, selected, sessions, chatId]);
+  const relevant = useMemo(() => {
+    if (chatId) return chatHistory?.id === chatId ? [...chatHistory.messages].reverse() : [];
+    return messages.filter(m => !selected ||
+      (m.from.kind === "session" && (m.from.projectId ?? projectAddresses.get(m.from.project)) === selected.id) ||
+      (m.to.kind === "project" && projectAddresses.get(m.to.name) === selected.id) || (m.to.kind === "pm" && projectAddresses.get(m.to.project) === selected.id) ||
+      (m.to.kind === "session" && sessions.some(s => m.to.kind === "session" && s.id === m.to.id && s.projectId === selected.id))
+    ).sort((a, b) => b.id - a.id);
+  }, [messages, selected, sessions, chatId, chatHistory, projectAddresses]);
   const shown = relevant.filter(m => (!search || `${m.from.label} ${recipientLabel(m, language)} ${m.text}`.toLocaleLowerCase().includes(search.toLocaleLowerCase())) &&
     (messageScope === "all" || (messageScope === "director" && m.to.kind === "director") || (messageScope === "waiting" && (m.pending.length > 0 || m.deliveries.length === 0))));
   const latest = relevant.filter(m => m.from.kind === "session" && m.to.kind === "director").filter((m, i, arr) => arr.findIndex(x => x.from.kind === "session" && m.from.kind === "session" && x.from.project === m.from.project) === i).slice(0, 6);
@@ -164,16 +201,17 @@ function Board() {
     const p = e.project;
     return showAllProjects || e.key === selection || p.openTasks > 0 ||
       sessions.some(s => s.projectId === p.id && (!e.chatId || s.id === e.chatId)) ||
-      messages.some(m => m.from.kind === "session" && m.from.project === p.name && (!e.chatId || e.chatId === m.from.id) && Date.now() - Date.parse(m.createdAt) < 7 * 86400000);
+      messages.some(m => m.from.kind === "session" && (m.from.projectId ?? projectAddresses.get(m.from.project)) === p.id && (!e.chatId || e.chatId === m.from.id) && Date.now() - Date.parse(m.createdAt) < 7 * 86400000);
   });
-  const visibleProjects = displayedProjects.filter(p => visibleEntries.some(e => e.project.id === p.id));
+  const matrixIds = new Set([...sessions.map(s => s.projectId), ...visibleEntries.map(e => e.project.id)]);
+  const visibleProjects = displayedProjects.filter(p => matrixIds.has(p.id));
   function select(key: string | null) {
     setSelection(key);
     if (entries.some(e => e.key === key && e.chatId)) setView("messages");
   }
 
-  const roleWaiting = to === "director" ? !directors.length : to.startsWith("pm:") && !sessions.some(s => s.role === "pm" && s.project === to.slice(3) && s.status !== "ended");
-  function write(target = chatId ? `session:${chatId}` : selected ? `pm:${selected.name}` : "director") { setTo(target); setCompose(true); setNotice(false); }
+  const roleWaiting = to === "director" ? !directors.length : to.startsWith("pm:") && !sessions.some(s => s.role === "pm" && s.projectId === projectAddresses.get(to.slice(3)) && s.status !== "ended");
+  function write(target = chatId ? `session:${chatId}` : selected ? `pm:${selected.id}` : "director") { setTo(target); setCompose(true); setNotice(false); }
   function reply(m: Message) { write(m.replyTo); }
   async function send() {
     if (sendLock.current || !text.trim()) return;
@@ -204,7 +242,7 @@ function Board() {
         {([["overview", ui.overview, LayoutDashboard], ["tasks", ui.tasks, ListTodo], ["messages", ui.messages, MessageSquare], ["guide", ui.guide.nav, BookOpen]] as const).map(([id, label, Icon]) => <button key={id} className={view === id ? "active" : ""} aria-current={view === id ? "page" : undefined} onClick={() => setView(id)}><Icon size={18} />{label}{id === "tasks" && <span className="nav-count">{openTasks.length}</span>}</button>)}
       </nav>
       <div className="section">{hasStandalone ? ui.projectsAndChats : ui.projects} <span>{visibleEntries.length}</span></div>
-      <label className="search-field sidebar-search"><Search size={15} /><input aria-label={ui.searchProjects} placeholder={ui.projectPlaceholder} value={projectSearch} onChange={e => setProjectSearch(e.target.value)} /></label>
+      <label className="search-field sidebar-search"><Search size={15} /><input aria-label={hasStandalone ? ui.searchProjectsAndChats : ui.searchProjects} placeholder={hasStandalone ? ui.searchProjectsAndChats : ui.projectPlaceholder} value={projectSearch} onChange={e => setProjectSearch(e.target.value)} /></label>
       <div className="project-list"><button className={`project-link ${!projectId ? "selected" : ""}`} onClick={() => select(null)}><LayoutDashboard size={15} /><span>{ui.allProjects}</span></button>
         {visibleEntries.map(e => <button key={e.key} title={e.name} className={`project-link ${selection === e.key ? "selected" : ""}`} onClick={() => select(e.key)}>{e.chatId ? <MessageSquare size={15} /> : <Folder size={15} />}<span>{e.name}</span>{!e.chatId && e.project.openTasks > 0 && <span className="nav-count">{e.project.openTasks}</span>}</button>)}
         {!visibleEntries.length && loaded && <p className="hint">{ui.noProject}</p>}
@@ -217,7 +255,7 @@ function Board() {
       </select><button className="text-button" onClick={() => setView("guide")}><CircleHelp size={17} />{ui.help}</button><span className={`connection ${connected ? "online" : ""}`}><i />{connected ? ui.connected : ui.connecting}</span></div>
     </aside>
     <main className="main">
-      <header className="topbar"><div><span className="breadcrumb">{ui.workspace}</span><ChevronRight size={14} /><strong className="desktop-project">{selectedTitle ?? ui.allProjects}</strong><select className="mobile-project" aria-label={ui.chooseProject} value={selection ?? ""} onChange={e => select(e.target.value || null)}><option value="">{ui.allProjects}</option>{entries.map(e => <option key={e.key} value={e.key}>{e.name}</option>)}</select></div><button className="secondary" onClick={() => write()}><MessageSquare size={16} />{chatId ? ui.writeChat : selected ? ui.writePm : ui.writeDirector}</button></header>
+      <header className="topbar"><div><span className="breadcrumb">{ui.workspace}</span><ChevronRight size={14} /><strong className="desktop-project">{selectedTitle ?? ui.allProjects}</strong><select className="mobile-project" aria-label={hasStandalone ? ui.chooseProjectOrChat : ui.chooseProject} value={selection ?? ""} onChange={e => select(e.target.value || null)}><option value="">{ui.allProjects}</option>{selected && !entry && <option value={selected.id}>{selectedTitle}</option>}{entries.map(e => <option key={e.key} value={e.key}>{e.name}</option>)}</select></div><button className="secondary" onClick={() => write()}><MessageSquare size={16} />{chatId ? ui.writeChat : selected ? ui.writePm : ui.writeDirector}</button></header>
       {error && <div role="alert" className="error-banner">{displayError(error, language)}<button onClick={() => setError(null)} aria-label={ui.dismissError}>×</button></div>}
       {notice && <div role="status" className="notice-banner">{ui.messageSaved}</div>}
       {!connected && loaded && <div role="status" className="error-banner">{ui.disconnected}</div>}
@@ -241,12 +279,12 @@ function Board() {
           <div className="report-grid">{latest.map(m => <MessageCard key={m.id} message={m} onReply={reply} />)}{!latest.length && <p className="hint">{ui.noReports}</p>}</div>
         </>}
         {view === "tasks" && <><div className="page-heading"><div><p className="eyebrow">{ui.taskEyebrow}</p><h1>{ui.tasks}</h1><p>{ui.tasksIntro}</p></div></div><Tasks tasks={displayedTasks} projects={displayedProjects} sessions={sessions} projectFilter={projectId} onError={setError} runs={runs} runApps={runApps} liveItems={liveItems} /></>}
-        {view === "messages" && <><div className="page-heading"><div><p className="eyebrow">{ui.messageEyebrow}</p><h1>{ui.messages}</h1><p>{ui.messagesIntro}</p></div><button className="primary" onClick={() => write()}><Plus size={17} />{ui.compose}</button></div><div className="message-filters"><label className="search-field"><Search size={17} /><input value={search} onChange={e => setSearch(e.target.value)} aria-label={ui.searchMessages} placeholder={ui.messagePlaceholder} /></label><select aria-label={ui.filterMessages} value={messageScope} onChange={e => setMessageScope(e.target.value)}><option value="all">{ui.allMessages}</option><option value="director">{ui.toDirector}</option><option value="waiting">{ui.pendingDelivery}</option></select><span>{shown.length} {ui.messageCount}</span></div><div className="message-list">{shown.slice(0, 100).map(m => <MessageCard key={m.id} message={m} onReply={reply} />)}{shown.length > 100 && <p>{ui.latestHundred}</p>}{!shown.length && <div className="empty">{ui.noMessages}</div>}</div></>}
+        {view === "messages" && <><div className="page-heading"><div><p className="eyebrow">{ui.messageEyebrow}</p><h1>{ui.messages}</h1><p>{ui.messagesIntro}</p></div><button className="primary" onClick={() => write()}><Plus size={17} />{ui.compose}</button></div><div className="message-filters"><label className="search-field"><Search size={17} /><input value={search} onChange={e => setSearch(e.target.value)} aria-label={ui.searchMessages} placeholder={ui.messagePlaceholder} /></label><select aria-label={ui.filterMessages} value={messageScope} onChange={e => setMessageScope(e.target.value)}><option value="all">{ui.allMessages}</option><option value="director">{ui.toDirector}</option><option value="waiting">{ui.pendingDelivery}</option></select><span>{shown.length} {ui.messageCount}</span></div><div className="message-list">{shown.slice(0, 100).map(m => <MessageCard key={m.id} message={m} onReply={reply} />)}{shown.length > 100 && <p>{ui.latestHundred}</p>}{!shown.length && <div className="empty">{chatId && chatHistory?.id !== chatId ? ui.loading : ui.noMessages}</div>}</div></>}
         {view === "guide" && <><div className="page-heading"><div><p className="eyebrow">{ui.guide.eyebrow}</p><h1>{ui.guide.title}</h1><p>{ui.guide.intro}</p></div></div><SetupLinks /><Guide onWrite={write} onTasks={() => setView("tasks")} /></>}
         {selected && <details className="session-settings"><summary>{ui.manageChats(selectedTitle ?? selected.name, projectSessions.length)}</summary><p>{ui.roleGuide}</p>{projectSessions.map(s => <div className="session-setting" key={s.id}><div><strong>{s.name}</strong><small><AppMark app={s.app} /> · {ui.connectionState[s.connection]} {ui.lastSeen} {date(s.lastSeenAt, locale)}</small></div><select aria-label={ui.roleFor(s.name)} value={s.role ?? ""} onChange={e => void editSession(s, { role: e.target.value || null })}><option value="">{ui.noRole}</option>{SESSION_ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}</select><button className="secondary" onClick={() => { const name = prompt(ui.chatName, s.name); if (name?.trim()) void editSession(s, { name: name.trim() }); }}>{ui.rename}</button><button className="text-button" onClick={() => void forget(s)}>{ui.unregister}</button></div>)}</details>}
         </>}
       </div>
-      {compose && <section className="composer" aria-label={ui.compose}><form onSubmit={e => { e.preventDefault(); void send(); }}><div className="composer-heading"><h2>{ui.compose}</h2><button className="text-button" type="button" onClick={() => setCompose(false)}>{ui.closeDraft}</button></div><div className="composer-fields"><label>{ui.from}<input placeholder={ui.human} value={from} onChange={e => setFrom(e.target.value)} /></label><label>{ui.to}<select value={to} onChange={e => setTo(e.target.value)}><option value="director">{ui.directorOption}</option>{!(["director", "all"].includes(to) || projects.some(p => to === `pm:${p.name}`) || sessions.some(s => to === `session:${s.id}`)) && <option value={to}>{entries.find(e => e.key === to)?.name ?? to}</option>}<optgroup label={ui.projectManagers}>{projects.map(p => <option key={p.id} value={`pm:${p.name}`}>PM {projectTitle(p, ui.noNativeProject)}</option>)}</optgroup><optgroup label={ui.singleChat}>{sessions.map(s => <option key={s.id} value={`session:${s.id}`}>{s.label}</option>)}</optgroup><option value="all">{ui.broadcast}</option></select></label></div><textarea ref={input} aria-label={ui.message} rows={3} value={text} onChange={e => setText(e.target.value)} placeholder={ui.composerPlaceholder} onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void send(); } }} /><div className="composer-footer"><small>{roleWaiting ? ui.roleUnavailable : to === "all" ? ui.broadcastHint : ui.sendHint}</small><button className="primary" disabled={sending || !text.trim()} type="submit"><Send size={16} />{sending ? ui.saving : ui.sendMessage}</button></div></form></section>}
+      {compose && <section className="composer" aria-label={ui.compose}><form onSubmit={e => { e.preventDefault(); void send(); }}><div className="composer-heading"><h2>{ui.compose}</h2><button className="text-button" type="button" onClick={() => setCompose(false)}>{ui.closeDraft}</button></div><div className="composer-fields"><label>{ui.from}<input placeholder={ui.human} value={from} onChange={e => setFrom(e.target.value)} /></label><label>{ui.to}<select value={to} onChange={e => setTo(e.target.value)}><option value="director">{ui.directorOption}</option>{!(["director", "all"].includes(to) || projects.some(p => to === `pm:${p.id}`) || sessions.some(s => to === `session:${s.id}`)) && <option value={to}>{entries.find(e => e.key === to)?.name ?? to}</option>}<optgroup label={ui.projectManagers}>{projects.map(p => <option key={p.id} value={`pm:${p.id}`}>PM {projectTitle(p, ui.noNativeProject)}</option>)}</optgroup><optgroup label={ui.singleChat}>{sessions.map(s => <option key={s.id} value={`session:${s.id}`}>{s.label}</option>)}</optgroup><option value="all">{ui.broadcast}</option></select></label></div><textarea ref={input} aria-label={ui.message} rows={3} value={text} onChange={e => setText(e.target.value)} placeholder={ui.composerPlaceholder} onKeyDown={e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void send(); } }} /><div className="composer-footer"><small>{roleWaiting ? ui.roleUnavailable : to === "all" ? ui.broadcastHint : ui.sendHint}</small><button className="primary" disabled={sending || !text.trim()} type="submit"><Send size={16} />{sending ? ui.saving : ui.sendMessage}</button></div></form></section>}
     </main>
   </div>;
 }

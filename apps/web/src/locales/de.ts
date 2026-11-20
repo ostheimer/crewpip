@@ -1,8 +1,11 @@
 import { TASK_STATUS_LABELS, RUN_MODE_LABELS, RUN_STATUS_LABELS, DELIVERY_LABELS } from "@crewpip/shared";
 
 export const de = {
+  historyLoadError: "Die Nachrichten dieses Chats konnten nicht geladen werden.",
   projectsAndChats: "Projekte und Chats",
   allEntryCount: (n: number) => `Alle ${n} Einträge anzeigen`,
+  searchProjectsAndChats: "Projekte und Chats suchen",
+  chooseProjectOrChat: "Projekt oder Chat auswählen",
   noNativeProject: "Chats ohne Projekt",
   writeChat: "Chat schreiben",
   person: "Person",

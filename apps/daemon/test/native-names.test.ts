@@ -71,3 +71,58 @@ test("Lokale App-Metadaten übernehmen Titel und Projektalias beim nächsten Abg
   assert.equal(names.projects.get(tmp), "Lager");
   assert.equal(names.titles.get("claude:cli"), "Später umbenannt");
 });
+
+test("Ein periodischer Namensabgleich lässt gesetzten Alias und neu vergebenen Director in Ruhe", (t) => {
+  const db = openDb(":memory:");
+  t.after(() => db.close());
+  const board = new Board(db, { titles: new Map(), projects: new Map() });
+  const inbox = new Inbox(db, board);
+  const entry = { pid: process.pid, sessionId: "cli", cwd: "/scratch/ordner", name: "Director", nameSource: "user", startedAt: null };
+  inbox.registrySync().upsert(entry);
+  assert.equal(inbox.sessions().find(s => s.id === "cli")?.role, "director");
+  inbox.upsertSession({ id: "next", app: "codex", cwd: entry.cwd, role: "director" });
+  inbox.registrySync().upsert(entry);
+  assert.equal(inbox.sessions().find(s => s.id === "next")?.role, "director");
+  inbox.renameSession("cli", "Lokaler Alias");
+  inbox.registrySync().upsert({ ...entry, name: "PM Team" });
+  const cli = inbox.sessions().find(s => s.id === "cli");
+  assert.equal(cli?.name, "Lokaler Alias");
+  assert.equal(cli?.role, null);
+});
+
+test("PM-Ziele gleichnamiger Projektordner treffen nur die gewählte Identität, vorhandene eindeutige Namen funktionieren weiter", (t) => {
+  const db = openDb(":memory:");
+  t.after(() => db.close());
+  const board = new Board(db);
+  const inbox = new Inbox(db, board);
+  const first = inbox.upsertSession({ app: "codex", id: "a", cwd: "/first/repo", role: "pm" });
+  const second = inbox.upsertSession({ app: "claude", id: "b", cwd: "/second/repo", role: "pm" });
+  assert.notEqual(first.projectId, second.projectId);
+  for (const [target, other] of [[first, second], [second, first]]) {
+    const msg = inbox.post({ human: "Test" }, `pm:${target.projectId}`, "Nur ein PM");
+    assert.deepEqual(msg.pending, [target.label]);
+    assert.deepEqual(inbox.pendingFor(other.id), []);
+    assert.deepEqual(inbox.recentFor(other.id, 1).filter(m => m.id === msg.id), []);
+    assert.deepEqual(inbox.take(target.id, "mcp-read").map(m => m.id), [msg.id]);
+  }
+  const unique = inbox.upsertSession({ app: "codex", id: "c", cwd: "/third/Mein Repo", role: "pm" });
+  const old = inbox.post({ human: "Test" }, "pm:Mein Repo", "Kompatibel");
+  assert.deepEqual(old.pending, [unique.label]);
+  assert.deepEqual(inbox.take(unique.id, "mcp-read").map(m => m.id), [old.id]);
+});
+
+test("Chatansicht liest wartende Rollenpost und ältere Direktnachrichten ohne Zustellung", (t) => {
+  const db = openDb(":memory:");
+  t.after(() => db.close());
+  const board = new Board(db);
+  const inbox = new Inbox(db, board);
+  const chat = inbox.upsertSession({ app: "codex", id: "cx", cwd: "/scratch/Rechner", role: "pm" });
+  const direct = inbox.post({ human: "Test" }, "session:cx", "Direkt");
+  const role = inbox.post({ human: "Test" }, `pm:${chat.projectId}`, "Für den PM");
+  for (let i = 0; i < 205; i++) inbox.post({ human: "Test" }, "human:Max", "Andere Post");
+  assert.ok(inbox.recent(200).every(m => m.id > role.id));
+  assert.deepEqual(inbox.recentFor("cx", 200).map(m => m.id), [direct.id, role.id]);
+  assert.deepEqual(inbox.recentFor("cx", 1)[0]?.deliveries, []);
+  inbox.endSession("cx");
+  assert.deepEqual(inbox.recentFor("cx", 200).map(m => m.id), [direct.id]);
+});

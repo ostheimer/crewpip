@@ -59,14 +59,15 @@ test("Übersicht zeigt je Repo verbundene und nur eingetragene Chats", async () 
     const panel = page.getByRole("region", { name: "Chats an CrewPip" });
     await panel.waitFor();
 
-    const alpha = panel.getByRole("group", { name: "demo-alpha" });
-    assert.match(await alpha.innerText(), /2 von 3 Chats mit CrewPip verbunden/);
-    const pm = alpha.locator(".conn-apps").getByRole("listitem").filter({ hasText: "PM demo-alpha" });
+    const alpha = panel.locator('[data-repo="demo-alpha"]');
+    await alpha.locator(".repo-toggle").click();
+    assert.match(await alpha.locator(".repo-count").getAttribute("aria-label") ?? "", /2 von 3 Chats mit CrewPip verbunden/);
+    const pm = alpha.locator(".conn-chat-list").getByRole("listitem").filter({ hasText: "PM demo-alpha" });
     assert.match(await pm.innerText(), /Post kommt an/);
     assert.match(await pm.innerText(), /PM/);
-    const codex = alpha.getByRole("list", { name: "Codex" });
+    const codex = alpha.locator(".conn-chat-list li").filter({ hasText: "Codex Umbau" });
     assert.match(await codex.innerText(), /Codex Umbau[\s\S]*Post kommt an/);
-    const nohook = alpha.locator(".conn-apps").getByRole("listitem").filter({ hasText: "Alter Arbeitschat" });
+    const nohook = alpha.locator(".conn-chat-list").getByRole("listitem").filter({ hasText: "Alter Arbeitschat" });
     assert.match(await nohook.innerText(), /Ohne Hook/);
     assert.match(await nohook.innerText(), /Letzter Kontakt/);
     // PM und Director stehen beim Repo, mit App.
@@ -76,8 +77,9 @@ test("Übersicht zeigt je Repo verbundene und nur eingetragene Chats", async () 
     // Beleg für den PR: CREWPIP_SCREENSHOT=<datei.png> legt ein Bild der Ansicht ab.
     if (process.env.CREWPIP_SCREENSHOT) await panel.screenshot({ path: process.env.CREWPIP_SCREENSHOT });
 
-    const beta = panel.getByRole("group", { name: "demo-beta" });
-    assert.match(await beta.innerText(), /Kein Chat mit CrewPip verbunden/);
+    const beta = panel.locator('[data-repo="demo-beta"]');
+    await beta.locator(".repo-toggle").click();
+    assert.match(await beta.locator(".repo-count").getAttribute("aria-label") ?? "", /0 von 1 Chat mit CrewPip verbunden/);
     assert.match(await beta.innerText(), /Veraltet/);
     assert.match(await beta.innerText(), /Kein Codex-Chat/);
     assert.match(await beta.innerText(), /PM:\s*nicht vergeben/);
@@ -85,7 +87,7 @@ test("Übersicht zeigt je Repo verbundene und nur eingetragene Chats", async () 
     await page.getByLabel("Sprache", { exact: true }).selectOption("en");
     const en = page.getByRole("region", { name: "Chats on CrewPip" });
     await en.waitFor();
-    assert.match(await en.getByRole("group", { name: "demo-beta" }).innerText(), /No chat connected to CrewPip/);
-    assert.match(await en.getByRole("group", { name: "demo-alpha" }).innerText(), /Without hook/);
+    assert.match(await en.locator('[data-repo="demo-beta"] .repo-count').getAttribute("aria-label") ?? "", /0 of 1 chat connected to CrewPip/);
+    assert.match(await en.locator('[data-repo="demo-alpha"]').innerText(), /Without hook/);
   } finally { await page.close(); }
 });

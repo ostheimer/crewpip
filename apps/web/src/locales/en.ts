@@ -1,8 +1,11 @@
 import type { de } from "./de.ts";
 
 export const en = {
+  historyLoadError: "Could not load messages for this chat.",
   projectsAndChats: "Projects and chats",
   allEntryCount: (n: number) => `Show all ${n} entries`,
+  searchProjectsAndChats: "Search projects and chats",
+  chooseProjectOrChat: "Select a project or chat",
   noNativeProject: "Chats without a project",
   writeChat: "Message chat",
   person: "Person",

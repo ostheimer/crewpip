@@ -71,7 +71,7 @@ const HUMAN_NAME = /^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,63}$/u;
 
 /** Woher der Anzeigename stammt. Ein stärkerer Wert wird nie von einem schwächeren überschrieben. */
 export type NameSource = "auto" | "registry" | "cli-user" | "user";
-const NAME_RANK: Record<NameSource, number> = { auto: 0, registry: 1, "cli-user": 2, user: 2 };
+const NAME_RANK: Record<NameSource, number> = { auto: 0, registry: 1, "cli-user": 2, user: 3 };
 
 /** Sessions, die nur über einen MCP-Aufruf bekannt sind, weil kein Hook sie angemeldet hat. */
 const PLACEHOLDER_PREFIX = "mcp-";
@@ -137,6 +137,18 @@ export function connectionOf(
   if (pid !== null && !alive(pid)) return "stale";
   if (!chain.length) return "no-hook";
   return "connected";
+}
+
+/** Dieselben dynamischen Ziele gelten für Posteingang und die lesende Chatansicht. */
+const SESSION_TARGETS = `(m.to_target = ? OR m.to_target IN (?, ?)
+  OR (m.to_target IN (?, 'all') AND m.created_at >= ?)
+  OR (? = 'pm' AND m.to_target IN (?, ?))
+  OR (? = 'director' AND m.to_target = 'director'))`;
+function targetParams(s: SessionRow, board: Board): string[] {
+  const id = s.project_id ?? s.project;
+  const alias = board.projectAddressId(s.project) === id ? s.project : id;
+  return [`session:${s.id}`, `project:${id}`, `project:${alias}`, `app:${s.app}`, s.started_at,
+    s.role ?? "", `pm:${id}`, `pm:${alias}`, s.role ?? ""];
 }
 
 function timeLabel(iso: string): string {
@@ -262,7 +274,14 @@ export class Inbox extends EventEmitter<InboxEvents> {
     // Die Rolle läuft über setRole, damit die Ablösung des bisherigen Directors oder PM
     // auch dann greift, wenn die Rolle nur aus dem Namen abgeleitet wurde.
     if (s.role !== undefined) this.setRole(s.id, s.role);
-    else if (role && nameApplied) this.setRole(s.id, role);
+    else if (role && nameApplied && (!existing || s.touch !== false)) this.setRole(s.id, role);
+    else if (existing?.ended_at && (existing.role === "director" || existing.role === "pm")) {
+      const occupied = this.db.prepare(
+        "SELECT 1 FROM sessions WHERE id <> ? AND ended_at IS NULL AND role = ? AND (role = 'director' OR project_id = ?)",
+      ).get(s.id, existing.role, proj.id);
+      if (occupied) this.setRole(s.id, null);
+    }
+    if (!existing || existing.project_id !== proj.id || (nameApplied && (existing.name !== name || existing.name_source !== source))) this.board.emit("projects");
 
     // Meldet sich eine echte Session für ein Verzeichnis, ist der MCP-Platzhalter überflüssig.
     if (!s.id.startsWith(PLACEHOLDER_PREFIX)) {
@@ -322,6 +341,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
     if (derived) this.setRole(id, derived);
     const row = this.sessionRow(id);
     if (!row) throw new Error("Unbekannte Session");
+    this.board.emit("projects");
     this.emit("sessions");
     return this.toSession(row);
   }
@@ -479,7 +499,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
     const display = r.from_kind === "session" ? this.board.displayForId(r.from_id) : undefined;
     const from: Party =
       r.from_kind === "session"
-        ? { kind: "session", id: r.from_id, app: r.from_app ?? "other", project: r.from_project ?? "", worktree: r.from_worktree, name: display?.name ?? r.from_name, label: display?.label ?? sessionLabel(r.from_app ?? "other", r.from_project ?? "", r.from_name, r.from_worktree), role: roleFromName(r.from_name) }
+        ? { kind: "session", id: r.from_id, app: r.from_app ?? "other", project: r.from_project ?? "", projectId: display?.projectId, worktree: r.from_worktree, name: display?.name ?? r.from_name, label: display?.label ?? sessionLabel(r.from_app ?? "other", r.from_project ?? "", r.from_name, r.from_worktree), role: roleFromName(r.from_name) }
         : { kind: "human", name: r.from_name, label: r.from_name };
     const to = parseTarget(r.to_target);
     const deliveries = (
@@ -509,17 +529,19 @@ export class Inbox extends EventEmitter<InboxEvents> {
     switch (t.kind) {
       case "session":
         return notSelf([this.sessionRow(t.id)].filter((s): s is SessionRow => !!s && !s.ended_at));
-      case "project":
-        return notSelf(this.db.prepare("SELECT * FROM sessions WHERE project = ? AND ended_at IS NULL").all(t.name) as unknown as SessionRow[]);
+      case "project": {
+        const projectId = this.board.projectAddressId(t.name);
+        return projectId ? notSelf(this.db.prepare("SELECT * FROM sessions WHERE project_id = ? AND ended_at IS NULL").all(projectId) as unknown as SessionRow[]) : [];
+      }
       case "app":
         return notSelf(this.db.prepare("SELECT * FROM sessions WHERE app = ? AND ended_at IS NULL AND started_at <= ?").all(t.app, m.created_at) as unknown as SessionRow[]);
       case "all":
         return notSelf(this.db.prepare("SELECT * FROM sessions WHERE ended_at IS NULL AND started_at <= ?").all(m.created_at) as unknown as SessionRow[]);
       case "pm": {
-        const project = this.db.prepare("SELECT id FROM projects WHERE id = ? OR name = ?").get(t.project, t.project) as { id: string } | undefined;
-        if (!project) return [];
+        const projectId = this.board.projectAddressId(t.project);
+        if (!projectId) return [];
         return notSelf(
-          this.db.prepare("SELECT * FROM sessions WHERE role = 'pm' AND project_id = ? AND ended_at IS NULL").all(project.id) as unknown as SessionRow[],
+          this.db.prepare("SELECT * FROM sessions WHERE role = 'pm' AND project_id = ? AND ended_at IS NULL").all(projectId) as unknown as SessionRow[],
         );
       }
       case "director":
@@ -565,18 +587,10 @@ export class Inbox extends EventEmitter<InboxEvents> {
         `SELECT m.* FROM messages m
          WHERE NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.message_id = m.id AND d.session_id = ?)
            AND NOT (m.from_kind = 'session' AND m.from_id = ?)
-           AND (m.to_target = ? OR m.to_target = ?
-                OR (m.to_target = ? AND m.created_at >= ?)
-                OR (m.to_target = 'all' AND m.created_at >= ?)
-                OR (? = 'pm' AND m.to_target IN (?, ?))
-                OR (? = 'director' AND m.to_target = 'director'))
+           AND ${SESSION_TARGETS}
          ORDER BY m.id ASC LIMIT ?`,
       )
-      .all(
-        s.id, s.id, `session:${s.id}`, `project:${s.project}`, `app:${s.app}`, s.started_at, s.started_at,
-        s.role ?? "", `pm:${s.project_id ?? ""}`, `pm:${s.project}`,
-        s.role ?? "", limit,
-      ) as unknown as MessageRow[];
+      .all(s.id, s.id, ...targetParams(s, this.board), limit) as unknown as MessageRow[];
     return rows.map((r) => this.toMessage(r));
   }
 
@@ -649,6 +663,18 @@ export class Inbox extends EventEmitter<InboxEvents> {
       flows.push({ from: from ? { kind: "session", ...from } : { kind: "human", name: r.from_id }, to, count: Number(r.n), lastAt: r.last_at });
     }
     return flows;
+  }
+
+  /** Neueste Nachrichten dieses Chats einschließlich aktuell wartender Rollenpost, ohne Abholung. */
+  recentFor(id: string, limit: number): Message[] {
+    const s = this.sessionRow(id);
+    if (!s) return [];
+    const rows = this.db.prepare(`SELECT m.* FROM messages m WHERE
+      (m.from_kind = 'session' AND m.from_id = ?) OR m.to_target = ?
+      OR EXISTS (SELECT 1 FROM deliveries d WHERE d.message_id = m.id AND d.session_id = ?)
+      OR (? IS NULL AND ${SESSION_TARGETS})
+      ORDER BY m.id DESC LIMIT ?`).all(id, `session:${id}`, id, s.ended_at, ...targetParams(s, this.board), limit) as unknown as MessageRow[];
+    return rows.reverse().map(r => this.toMessage(r));
   }
 
   recent(limit = 200): Message[] {

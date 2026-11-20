@@ -62,7 +62,7 @@ Bei Codex kommen Projektnamen und Chat-Titel aus der lokalen Desktop-Datenbank u
 Titelindex. Bei Claude kommen sie aus den Desktop-Metadaten und der CLI-Registry.
 In der Seitenleiste und der mobilen Auswahl öffnet ein eigenständiger Chat seinen
 Nachrichtenverlauf. Ein Projekt mit nativem Namen behält seinen eigenen Eintrag.
-Ruhende und beendete Chats findest du auch über die Suche und „Alle Projekte anzeigen“.
+Ruhende und beendete Chats findest du auch über die Suche und die vollständige Liste.
 Explizit vergebene CrewPip-Namen bleiben erhalten. Fehlt eine Quelle, nutzt CrewPip die
 vorhandenen Namen oder die Startzeit. Zustelladressen und Rollen bleiben an ihre IDs gebunden.
 

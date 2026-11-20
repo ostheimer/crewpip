@@ -183,7 +183,7 @@ export interface Session {
 
 /** Absender einer Nachricht. */
 export type Party =
-  | { kind: "session"; id: string; app: AppKind; project: string; worktree: string | null; name: string; label: string; role: SessionRole | null }
+  | { kind: "session"; id: string; app: AppKind; project: string; projectId?: string; worktree: string | null; name: string; label: string; role: SessionRole | null }
   | { kind: "human"; name: string; label: string };
 
 /**

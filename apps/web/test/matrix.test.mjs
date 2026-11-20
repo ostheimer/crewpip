@@ -31,7 +31,7 @@ test("Matrix-Ableitung: Zeilen je Repo, Spalten nur für vorkommende Apps, Namen
     const m = buildMatrix(sessions, projects, null);
     assert.deepEqual(m.apps, ["claude", "codex", "cursor", "antigravity"]);
     assert.equal(m.rows.length, 14);
-    assert.deepEqual(m.rows.map(r => r.name), [...m.rows.map(r => r.name)].sort((a, b) => a.localeCompare(b)));
+    assert.deepEqual(m.rows.map(r => r.name), m.rows.map(r => r.name).sort((a, b) => a.localeCompare(b)));
     assert.deepEqual(m.withoutChat.map(p => p.name), ["archiv-demo"]);
     const ex = m.rows.find(r => r.name === "example.org");
     // Verbundene Chats vor veralteten; Namen exakt aus dem Feld `name`.

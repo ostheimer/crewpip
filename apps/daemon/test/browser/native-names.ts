@@ -34,6 +34,11 @@ test("Seitenleiste und mobile Auswahl öffnen jeden eigenständigen Chat unter s
   t.after(() => browser.close());
   const page = await browser.newPage({ locale: "de-AT" });
   await page.goto(`http://127.0.0.1:${(daemon.server.address() as AddressInfo).port}`);
+  const filter = page.locator(".sidebar-search input");
+  await filter.fill("Wartung");
+  await page.locator('.matrix-repo[data-repo="Werkstatt"]').waitFor();
+  assert.equal(await page.locator('.matrix-repo[data-repo="git-ordner"]').count(), 0);
+  await filter.fill("");
   await page.locator(".all-projects").click();
   await page.locator(".project-list").getByRole("button", { name: "Wartung", exact: true }).click();
   assert.equal(await page.locator(".desktop-project").innerText(), "Wartung");
@@ -49,6 +54,16 @@ test("Seitenleiste und mobile Auswahl öffnen jeden eigenständigen Chat unter s
   await select.selectOption({ label: "Planung" });
   await page.getByRole("button", { name: "Chat schreiben", exact: true }).click();
   assert.equal(await page.locator(".composer select").inputValue(), "session:beta");
+  const card = page.locator(".message-list .message-card").filter({ hasText: "Nur der zweite Chat" });
+  await card.waitFor();
   assert.equal(await page.locator(".message-list .message-card").count(), 1);
-  assert.match(await page.locator(".message-list .message-card").innerText(), /Nur der zweite Chat/);
+  // Die Browserseite bleibt geöffnet, während Registry, lokaler Alias und Zustellung wechseln.
+  inbox.registrySync().upsert({ sessionId: "neu", name: "Neuer Chat", cwd: "/nirgends/neuer-ordner", pid: process.pid, nameSource: "user", startedAt: null });
+  await select.locator('option[value="session:neu"]').waitFor({ state: "attached" });
+  await select.selectOption("");
+  inbox.renameSession("beta", "Neuer Titel");
+  await page.waitForFunction(() => document.querySelector('option[value="session:beta"]')?.textContent === "Neuer Titel");
+  inbox.take("beta", "mcp-read");
+  await card.getByText("Im Empfänger-Chat zugestellt", { exact: true }).waitFor();
+  assert.doesNotMatch(await card.innerText(), /wartet/);
 });

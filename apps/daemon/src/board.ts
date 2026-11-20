@@ -118,7 +118,7 @@ export class Board extends EventEmitter<BoardEvents> {
 
   displayForId(id: string) {
     const row = this.db.prepare("SELECT id, app, name, name_source, project, project_id, worktree FROM sessions WHERE id = ?").get(id) as DisplayRow | undefined;
-    return row && this.sessionDisplay(row);
+    return row && { ...this.sessionDisplay(row), projectId: row.project_id ?? undefined };
   }
 
   sessionDisplay(s: DisplayRow) {
@@ -163,6 +163,13 @@ export class Board extends EventEmitter<BoardEvents> {
   projects(): Project[] {
     const rows = this.db.prepare("SELECT * FROM projects ORDER BY name").all() as unknown as ProjectRow[];
     return rows.map((r) => this.toProject(r, true));
+  }
+
+  /** Adressen bevorzugen die stabile ID. Ein älterer Anzeigename muss eindeutig sein. */
+  projectAddressId(address: string): string | null {
+    const rows = this.db.prepare("SELECT id FROM projects WHERE id = ? OR name = ? ORDER BY (id = ?) DESC LIMIT 2").all(address, address, address);
+    const first = rows[0]?.id;
+    return typeof first === "string" && (first === address || rows.length === 1) ? first : null;
   }
 
   project(id: string): Project | null {
