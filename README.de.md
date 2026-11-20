@@ -277,9 +277,11 @@ Unterschiede zu den anderen Apps (geprüft mit Antigravity 2.33 am 20.11.2026):
   eingespielt, weil der Daemon den Zustellnachweis prüft. Eingespielt wird als
   `userMessage`; die Post erscheint im Gespräch deshalb als Nachricht mit `[CrewPip]` vorne.
 - **Turn-Ende:** `Stop` antwortet mit `"decision": "continue"`, die Post steht in `reason`.
-  Danach ruft Antigravity das Modell erneut auf; `PreInvocation` kommt dann mit demselben
-  `lastUserInput`. Die Schleifensperre hebt deshalb nur ein neuer menschlicher Prompt auf,
-  erkannt an einer Prüfsumme dieses Felds. Der Prompt-Text selbst verlässt den Hook nicht.
+  Danach ruft Antigravity das Modell erneut auf; `PreInvocation` kommt dann mit
+  `invocationNum` 1 statt 0. Die Schleifensperre hebt deshalb nur ein `PreInvocation` mit
+  `invocationNum` 0 auf, also der erste Modellaufruf nach einer Eingabe des Menschen.
+- **Sitzungsschlüssel:** Jede Einspielung bleibt im Gespräch sichtbar stehen. Der Schlüssel
+  kommt deshalb nur zu Beginn eines Turns oder zusammen mit Post, nicht bei jedem Modellaufruf.
 - **Identität:** Das Gespräch heißt `conversationId`, das Projekt kommt aus `cwd`
   (bzw. `workspacePaths`). Alle Gespräche laufen über den `language_server` der App; arbeiten
   zwei im selben Ordner, trennt sie der Sitzungsschlüssel wie bei Codex.

@@ -71,11 +71,10 @@ test("Hook meldet ein Antigravity-Gespräch unter seiner conversationId an", asy
 
 test("PreInvocation: jede Nachricht genau einmal, auch bei vielen Modellaufrufen im Turn", async () => {
   await postHuman("session:ag-1", "#20 eins");
-  const turn = "t-1";
-  const first = await hook("prompt", { sessionId: "ag-1", cwd: "/p/ag-projekt", turn });
+  const first = await hook("prompt", { sessionId: "ag-1", cwd: "/p/ag-projekt", turnStart: true });
   assert.deepEqual(first.messages.map((m) => m.text), ["#20 eins"]);
   for (let i = 0; i < 3; i++) {
-    const again = await hook("prompt", { sessionId: "ag-1", cwd: "/p/ag-projekt", turn });
+    const again = await hook("prompt", { sessionId: "ag-1", cwd: "/p/ag-projekt", turnStart: false });
     assert.deepEqual(again.messages, [], `Modellaufruf ${i + 2}: nichts doppelt`);
   }
   const msgs = (await (await get(`${base}/api/messages`)).json()) as { text: string; deliveries: { sessionId: string; method: string }[] }[];
@@ -91,14 +90,14 @@ test("Schleifensperre: PreInvocation im selben Turn hebt sie nicht auf, ein neue
   assert.equal(stop.mayContinue, false, "Sperre greift");
   // Nach einem Stop mit "continue" ruft Antigravity das Modell erneut auf; PreInvocation
   // feuert mit demselben Turn. Das darf die Sperre nicht zurücksetzen.
-  await hook("prompt", { sessionId: "ag-1", cwd: "/p/ag-projekt", turn: "t-1" });
+  await hook("prompt", { sessionId: "ag-1", cwd: "/p/ag-projekt", turnStart: false });
   stop = await hook("stop", { sessionId: "ag-1", cwd: "/p/ag-projekt" });
   assert.equal(stop.mayContinue, true, "PreInvocation hat die Nachricht schon zugestellt, nichts mehr offen");
   await postHuman("session:ag-1", "#20 noch eine");
   stop = await hook("stop", { sessionId: "ag-1", cwd: "/p/ag-projekt" });
   assert.equal(stop.mayContinue, false, "gleicher Turn: Sperre bleibt");
   // Ein neuer menschlicher Prompt ist ein neuer Turn.
-  const neu = await hook("prompt", { sessionId: "ag-1", cwd: "/p/ag-projekt", turn: "t-2" });
+  const neu = await hook("prompt", { sessionId: "ag-1", cwd: "/p/ag-projekt", turnStart: true });
   assert.deepEqual(neu.messages.map((m) => m.text), ["#20 noch eine"]);
   await postHuman("session:ag-1", "#20 nach Prompt");
   stop = await hook("stop", { sessionId: "ag-1", cwd: "/p/ag-projekt" });
@@ -113,8 +112,15 @@ test("Zwei Gespräche im selben Repo teilen den Prozess: Schlüssel trennt sie, 
   const b = await hook("session-start", { sessionId: "ag-b", cwd });
   proc.chain = [];
   const keyB = b.sessionKey!;
-  const keyA = (await hook("prompt", { sessionId: "ag-a", cwd, turn: "x" })).sessionKey!;
+  const keyA = (await hook("prompt", { sessionId: "ag-a", cwd, turnStart: true })).sessionKey!;
   assert.ok(keyA && keyB && keyA !== keyB);
+  // Jede Einspielung bleibt in Antigravity als sichtbare Nachricht stehen. Weitere Modellaufrufe
+  // im selben Turn bekommen den Schlüssel deshalb nicht noch einmal, außer zusammen mit Post.
+  assert.equal((await hook("prompt", { sessionId: "ag-a", cwd, turnStart: false })).sessionKey, undefined, "kein Schlüssel bei jedem Modellaufruf");
+  await postHuman("session:ag-a", "#20 an a");
+  const mitPost = await hook("prompt", { sessionId: "ag-a", cwd, turnStart: false });
+  assert.equal(mitPost.sessionKey, keyA, "mit Post reist der Schlüssel mit");
+  assert.deepEqual(mitPost.messages.map((m) => m.text), ["#20 an a"]);
 
   const client = new Client({ name: "test", version: "0.0.0" });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp/antigravity?app=antigravity`), { requestInit: { headers: { "x-crewpip-token": TOKEN } } }));

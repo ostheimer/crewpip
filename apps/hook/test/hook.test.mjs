@@ -72,8 +72,9 @@ test("Antigravity (#20): Gespräch über conversationId, Projekt über workspace
   const p = { conversationId: "ag-conv-1", workspacePaths: ["/p/ag-projekt", "/p/zweit"], lastUserInput: "Fix den Test" };
   assert.equal(sessionIdOf("antigravity", p), "ag-conv-1");
   assert.equal(cwdOf("antigravity", p, {}), "/p/ag-projekt");
-  // Antigravity 2.33 schickt zusätzlich cwd mit; das hat Vorrang.
-  assert.equal(cwdOf("antigravity", { ...p, cwd: "/p/echt" }, {}), "/p/echt");
+  // Antigravity 2.33 schickt zusätzlich cwd mit; es dient nur als Rückfall, leere Werte zählen nicht.
+  assert.equal(cwdOf("antigravity", { ...p, cwd: "/p/anders" }, {}), "/p/ag-projekt");
+  assert.equal(cwdOf("antigravity", { conversationId: "x", workspacePaths: [""], cwd: "/p/echt" }, {}), "/p/echt");
   assert.equal(cwdOf("antigravity", { conversationId: "x" }, {}), null, "ohne Projekt keine Anmeldung, nie ~/.gemini/config");
 });
 
@@ -91,23 +92,23 @@ test("Antigravity (#20): Ausgabe als injectSteps bzw. Stop mit continue", () => 
   assert.equal(formatOutput("antigravity", "stop", { messages: [], sessionKey: "k" }), null, "leerer Stop setzt nicht fort");
 });
 
-test("Antigravity (#20): callDaemon schickt Turn-Merkmal aus lastUserInput, nicht den Text", async () => {
+test("Antigravity (#20): callDaemon meldet Turn-Beginn nur bei invocationNum 0, ohne Prompt-Text", async () => {
   let seen;
   const fetchImpl = async (url, init) => { seen = { url, body: JSON.parse(init.body) }; return { ok: true, json: async () => ({ session: null, messages: [], mayContinue: true }) }; };
-  const payload = { conversationId: "c1", workspacePaths: ["/p/x"], lastUserInput: "geheimer Prompt", invocationNum: 2 };
+  const payload = { conversationId: "c1", workspacePaths: ["/p/x"], lastUserInput: "geheimer Prompt", invocationNum: 0 };
   await callDaemon({ app: "antigravity", event: "prompt", payload, env: {}, fetchImpl });
   assert.equal(seen.url, "http://127.0.0.1:7357/hooks/antigravity/prompt");
   assert.equal(seen.body.sessionId, "c1");
   assert.equal(seen.body.cwd, "/p/x");
-  assert.equal(typeof seen.body.turn, "string");
+  assert.equal(seen.body.turnStart, true, "erster Modellaufruf nach Eingabe des Menschen");
   assert.ok(!JSON.stringify(seen.body).includes("geheimer Prompt"), "Prompt-Text verlässt den Hook nicht");
-  const t1 = seen.body.turn;
-  await callDaemon({ app: "antigravity", event: "prompt", payload: { ...payload, invocationNum: 5 }, env: {}, fetchImpl });
-  assert.equal(seen.body.turn, t1, "gleicher Prompt, gleicher Turn");
-  await callDaemon({ app: "antigravity", event: "prompt", payload: { ...payload, lastUserInput: "neu" }, env: {}, fetchImpl });
-  assert.notEqual(seen.body.turn, t1);
+  // Gemessen: nach einem Stop mit "continue" kommt PreInvocation mit invocationNum 1.
+  await callDaemon({ app: "antigravity", event: "prompt", payload: { ...payload, invocationNum: 1 }, env: {}, fetchImpl });
+  assert.equal(seen.body.turnStart, false);
+  await callDaemon({ app: "antigravity", event: "prompt", payload: { conversationId: "c1", workspacePaths: ["/p/x"] }, env: {}, fetchImpl });
+  assert.equal(seen.body.turnStart, false, "ohne invocationNum vorsichtshalber kein neuer Turn");
   await callDaemon({ app: "claude", event: "prompt", payload: { session_id: "s", cwd: "/p" }, env: {}, fetchImpl });
-  assert.equal(seen.body.turn ?? null, null, "andere Apps ohne Turn-Merkmal");
+  assert.equal(seen.body.turnStart, null, "andere Apps: jeder prompt ist ein menschlicher Prompt");
 });
 
 test("Antigravity (#20): Skript akzeptiert die App und endet still ohne Daemon", () => {

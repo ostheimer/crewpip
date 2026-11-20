@@ -264,10 +264,12 @@ export interface HookRequest {
   /** Nummer des Laufs aus CREWPIP_RUN, wenn CrewPip diese Session gestartet hat */
   runId?: number | null;
   /**
-   * Merkmal des Turns (nur Antigravity): Prüfsumme des letzten menschlichen Prompts. Ohne
-   * Merkmal hebt jeder "prompt" die Schleifensperre auf, mit Merkmal nur ein neues.
+   * Nur Antigravity: false, wenn "prompt" ein weiterer Modellaufruf im selben Turn ist
+   * (PreInvocation mit invocationNum > 0). Dann bleibt die Schleifensperre stehen und der
+   * Sitzungsschlüssel wird nicht erneut eingespielt. Fehlt das Feld, ist jeder "prompt" ein
+   * menschlicher Prompt.
    */
-  turn?: string | null;
+  turnStart?: boolean | null;
   payload?: unknown;
 }
 
