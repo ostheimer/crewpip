@@ -43,6 +43,7 @@ const patterns: [RegExp, string][] = [
   [/^Unbekannter Modus: (.*)$/s, "Unknown mode: $1"],
   [/^Unbekannter Status: (.*)$/s, "Unknown status: $1"],
   [/^Unbekannte Rolle: (.*)$/s, "Unknown role: $1"],
+  [/^Session ist beendet: (.*)$/s, "Session has ended: $1"],
   [/^Unbekannter Lauf: (.*)$/s, "Unknown run: $1"],
   [/^Statuswechsel (\w+) → (\w+) ist nicht vorgesehen$/, "Cannot change the status from $1 to $2."],
   [/^Task #(\d+) hat schon einen Worktree: (.*)$/s, "Task #$1 already has a worktree: $2"],

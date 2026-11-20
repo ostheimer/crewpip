@@ -442,6 +442,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
     const row = this.sessionRow(id);
     if (!row) throw new Error(`Unbekannte Session: ${id}`);
     if (row.role === role) return this.toSession(row);
+    if (row.ended_at && (role === "pm" || role === "director")) throw new Error(`Session ist beendet: ${row.name}`);
     const log = this.db.prepare("INSERT INTO role_changes(role, project_id, from_session, to_session, actor) VALUES (?, ?, ?, ?, ?)");
     const scope = (r: SessionRole) => (r === "director" ? null : row.project_id);
     if (role === "director" || role === "pm") {
@@ -499,8 +500,10 @@ export class Inbox extends EventEmitter<InboxEvents> {
     this.db.prepare("UPDATE sessions SET role_claim = ? WHERE id = ?").run(name, id);
     const claimed = roleFromName(name);
     if (!claimed || claimed === row.role) return;
+    // PM und Director gibt ein Chat nur ausdrücklich ab, nicht durch Umbenennen.
+    if (row.role === "pm" || row.role === "director") return;
     if (claimed === "worker") {
-      // Worker ist nicht exklusiv; eine PM- oder Director-Rolle wird nur ausdrücklich abgegeben.
+      // Worker ist nicht exklusiv.
       if (!row.role) this.setRole(id, "worker", "name");
       return;
     }

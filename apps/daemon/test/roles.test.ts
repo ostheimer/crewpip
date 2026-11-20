@@ -121,6 +121,17 @@ test("#28/2 Bestehende Rollen bleiben beim Start unverändert", () => {
   assert.equal(role(second, "claudepm"), null);
 });
 
+test("#28/2 Review: Inhaber verliert PM nicht durch Umbenennen, beendete Chats bekommen keine exklusive Rolle", () => {
+  const { inbox } = setup();
+  inbox.upsertSession({ id: "pm", app: "claude", cwd: "/p/x", name: "PM x" });
+  inbox.renameSession("pm", "Director x");
+  assert.equal(role(inbox, "pm"), "pm", "PM wird nur ausdrücklich abgegeben");
+  inbox.upsertSession({ id: "alt", app: "codex", cwd: "/p/x" });
+  inbox.endSession("alt");
+  assert.throws(() => inbox.setRole("alt", "pm", "dashboard"), /beendet/);
+  assert.equal(role(inbox, "pm"), "pm");
+});
+
 // ---- Kriterien 3 und 4: set_role über MCP, Rechte, Protokoll, wartende Post ---------------
 
 const TOKEN = "t";
