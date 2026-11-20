@@ -102,6 +102,9 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
     const cwd = typeof body.cwd === "string" && body.cwd ? body.cwd : null;
     const response: HookResponse = { session: null, messages: [], mayContinue: true };
     if (!sessionId || !cwd) {
+      // Ohne beides lässt sich der Aufruf keiner Session zuordnen. Festhalten, damit ein Chat
+      // auf „Ohne Hook“ erklärbar ist (#21); keine Inhalte.
+      log(`[hooks] ${kind}/${event}: Aufruf ohne ${sessionId ? "Verzeichnis" : "Sitzungs-ID"} verworfen`);
       res.json(response);
       return;
     }

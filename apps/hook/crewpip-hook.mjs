@@ -15,9 +15,11 @@
  * CREWPIP_SESSION_NAME (optionaler Anzeigename der Session), CREWPIP_RUN (Nummer des Laufs,
  * wenn CrewPip die Session gestartet hat), CREWPIP_HOOK_TIMEOUT_MS (Standard 2500),
  * CREWPIP_HOOK_DEBUG (Dateipfad: schreibt Eingabe, Anfrage und Antwort dorthin),
+ * CREWPIP_HOOK_ERROR_LOG (Standard ~/.crewpip/hook-errors.log: eine Zeile je fehlgeschlagenem
+ * Aufruf, ohne Inhalte und ohne Token),
  * CREWPIP_TOKEN oder CREWPIP_TOKEN_FILE (Standard ~/.crewpip/token).
  */
-import { appendFileSync, readFileSync } from "node:fs";
+import { appendFileSync, readFileSync, renameSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -164,6 +166,39 @@ export async function callDaemon({ app, event, payload, env, fetchImpl = fetch }
   return res.json();
 }
 
+/** Ab dieser Größe wird das Fehlerprotokoll einmal nach *.1 verschoben. */
+const ERROR_LOG_MAX = 256 * 1024;
+
+/**
+ * Kurzer Grund eines Fehlschlags, ohne Inhalte: fetch meldet "fetch failed" und legt die
+ * Ursache (z. B. ECONNREFUSED) in cause; ein Zeitlimit heißt TimeoutError.
+ */
+export function errorReason(e) {
+  if (!e) return "unbekannt";
+  if (e.name === "TimeoutError" || e.name === "AbortError") return "Zeitlimit überschritten";
+  const cause = e.cause?.code ?? e.cause?.message;
+  return String(e.message ?? e).slice(0, 200) + (cause ? ` (${String(cause).slice(0, 80)})` : "");
+}
+
+/**
+ * Hält einen fehlgeschlagenen Aufruf fest, damit „Ohne Hook“ im Dashboard erklärbar ist (#21).
+ * Nur App, Ereignis, Sitzungs-ID, Verzeichnis und Grund; nie Prompt, Antwort oder Token.
+ */
+export function logFailure({ app, event, payload, error, env = process.env }) {
+  const file = env.CREWPIP_HOOK_ERROR_LOG ?? join(homedir(), ".crewpip", "hook-errors.log");
+  try {
+    try {
+      if (statSync(file).size > ERROR_LOG_MAX) renameSync(file, `${file}.1`);
+    } catch {
+      // Datei gibt es noch nicht.
+    }
+    const entry = { at: new Date().toISOString(), app, event, sessionId: payload ? sessionIdOf(app, payload) : null, cwd: payload ? cwdOf(app, payload, env) : null, error };
+    appendFileSync(file, JSON.stringify(entry) + "\n", { mode: 0o600 });
+  } catch {
+    // Protokollieren darf den Hook nie stören.
+  }
+}
+
 function debug(entry) {
   const file = process.env.CREWPIP_HOOK_DEBUG;
   if (!file) return;
@@ -175,9 +210,18 @@ function debug(entry) {
 }
 
 async function main() {
-  if (!APPS.has(app) || !EVENTS.has(event)) return; // falsch aufgerufen: still beenden
+  if (!APPS.has(app) || !EVENTS.has(event)) {
+    // Falsch aufgerufen: still beenden, aber festhalten, damit eine kaputte Einrichtung auffällt.
+    logFailure({ app: app ?? null, event: event ?? null, payload: null, error: "unbekannte App oder unbekanntes Ereignis" });
+    return;
+  }
   const payload = readStdinJson();
   debug({ payload });
+  if (!sessionIdOf(app, payload)) {
+    // Ohne Sitzungs-ID kann der Daemon den Aufruf keiner Session zuordnen; er würde ihn verwerfen.
+    logFailure({ app, event, payload, error: "Eingabe ohne Sitzungs-ID" });
+    return;
+  }
   try {
     const response = await callDaemon({ app, event, payload, env: process.env });
     debug({ response });
@@ -185,6 +229,7 @@ async function main() {
     if (out) process.stdout.write(JSON.stringify(out) + "\n");
   } catch (e) {
     debug({ error: String(e && e.message) });
+    logFailure({ app, event, payload, error: errorReason(e) });
     throw e;
   }
 }

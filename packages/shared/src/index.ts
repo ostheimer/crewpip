@@ -21,10 +21,12 @@ export type SessionStatus = "idle" | "working" | "ended";
  *   Ruhe (idle, alter letzter Kontakt) ändert daran nichts.
  * - "no-hook": eingetragen (Registry oder MCP-Aufruf), aber nie über den Hook gemeldet;
  *   Post erreicht ihn nicht von selbst.
+ * - "restart-needed": der Prozess läuft und hatte seit seinem Start einen Turn, aber von ihm
+ *   kam nie ein Hook. Er hat die CrewPip-Hooks nicht geladen; erst ein Neustart hilft (#21).
  * - "stale": der Agent-Prozess läuft nicht mehr, der Eintrag ist liegen geblieben.
  * - "ended": ausgetragen.
  */
-export const CONNECTION_STATES = ["connected", "no-hook", "stale", "ended"] as const;
+export const CONNECTION_STATES = ["connected", "no-hook", "restart-needed", "stale", "ended"] as const;
 export type ConnectionState = (typeof CONNECTION_STATES)[number];
 
 export const SESSION_ROLES = ["director", "pm", "worker"] as const;

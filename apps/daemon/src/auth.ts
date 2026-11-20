@@ -104,6 +104,8 @@ export function createAuth(opts: AuthOptions) {
     }
     const given = tokenFromRequest(req);
     if (!given || !sameToken(given, opts.token)) {
+      // Ein abgelehnter Hook ist ein Grund für „Ohne Hook“ (#21). Nur Pfad und Art, nie das Token.
+      if (req.originalUrl.startsWith("/hooks/")) opts.log?.(`[auth] Hook ${req.originalUrl.split("?")[0]} abgelehnt: Token ${given ? "falsch" : "fehlt"}`);
       res.status(401).json({ error: "Token fehlt oder stimmt nicht. Es steht in ~/.crewpip/token." });
       return;
     }

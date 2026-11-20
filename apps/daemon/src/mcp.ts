@@ -50,7 +50,7 @@ export function renderMessages(msgs: Message[]): string {
     .join("\n\n---\n\n");
 }
 
-const CONNECTION_WORDS: Record<Session["connection"], string> = { connected: "verbunden", "no-hook": "ohne-hook", stale: "veraltet", ended: "beendet" };
+const CONNECTION_WORDS: Record<Session["connection"], string> = { connected: "verbunden", "no-hook": "ohne-hook", "restart-needed": "neustart-noetig", stale: "veraltet", ended: "beendet" };
 
 function renderSessions(all: Session[], self: Session | null): string {
   const byProject = new Map<string, Session[]>();
@@ -72,7 +72,7 @@ function renderSessions(all: Session[], self: Session | null): string {
     "Weitere Ziele: all, app:claude, app:cursor, app:codex, app:antigravity, human:<name>.",
     "pm:<projekt> und director folgen der Rolle, nicht der Sitzung: Sie erreichen auch den,",
     "der die Rolle erst später übernimmt, und überstehen einen Neustart.",
-    "verbindung=ohne-hook oder veraltet: Post erreicht diesen Chat nicht von selbst (docs/verbindung.md).",
+    "verbindung=ohne-hook, neustart-noetig oder veraltet: Post erreicht diesen Chat nicht von selbst (docs/verbindung.md).",
   );
   return lines.join("\n");
 }

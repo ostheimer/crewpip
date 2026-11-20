@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import os from "node:os";
 import { formatOutput, callDaemon, sessionIdOf, cwdOf, renderMessages } from "../crewpip-hook.mjs";
+
+// Fehlschläge dieser Tests nicht ins echte Protokoll ~/.crewpip/hook-errors.log schreiben.
+process.env.CREWPIP_HOOK_ERROR_LOG = path.join(os.tmpdir(), `crewpip-hook-test-${process.pid}.log`);
 
 const script = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../crewpip-hook.mjs");
 const msgs = [{ id: 7, from: { kind: "session", label: "Codex · example-project / Thread 14:02" }, toLabel: "Claude · example-project / api-worker", replyTo: "session:x1", text: "hi", createdAt: "2026-09-01T10:00:00Z" }];
