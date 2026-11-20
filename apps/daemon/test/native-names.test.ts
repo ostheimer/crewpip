@@ -126,3 +126,24 @@ test("Chatansicht liest wartende Rollenpost und ältere Direktnachrichten ohne Z
   inbox.endSession("cx");
   assert.deepEqual(inbox.recentFor("cx", 200).map(m => m.id), [direct.id]);
 });
+
+test("Bestätigte alte Claude-Namen folgen der nächsten Umbenennung, abweichende lokale Aliase bleiben erhalten", (t) => {
+  const db = openDb(":memory:");
+  t.after(() => db.close());
+  const titles = new Map([["claude:cli", "Betrieb"], ["claude:local", "Quelltitel"], ["claude:desktop", "Desktopname"]]);
+  const board = new Board(db, { titles, projects: new Map() });
+  const inbox = new Inbox(db, board);
+  for (const [id, name] of [["cli", "Betrieb"], ["local", "Mein Alias"], ["desktop", "Desktopname"]]) {
+    inbox.upsertSession({ id, name, cwd: "/scratch", app: "claude" });
+  }
+  // Der Ausgangsstand verwendete 'user' sowohl für CLI-/rename als auch für lokale Aliase.
+  db.exec("UPDATE sessions SET name_source = 'user'");
+  inbox.registrySync().upsert({ sessionId: "cli", pid: process.pid, cwd: "/scratch", name: "Betrieb", nameSource: "user", startedAt: null });
+  board.confirmLegacyClaudeTitles();
+  titles.set("claude:desktop", "Neuer Desktopname");
+  assert.equal(inbox.sessions().find(s => s.id === "desktop")?.name, "Neuer Desktopname");
+  titles.set("claude:cli", "Neuer Betrieb");
+  titles.set("claude:local", "Anderer Quelltitel");
+  assert.equal(inbox.sessions().find(s => s.id === "cli")?.name, "Neuer Betrieb");
+  assert.equal(inbox.sessions().find(s => s.id === "local")?.name, "Mein Alias");
+});

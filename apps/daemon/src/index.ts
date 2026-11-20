@@ -45,6 +45,7 @@ async function refreshNames() {
   try {
     const known = db.prepare("SELECT id, app FROM sessions WHERE app IN ('codex', 'claude')").all() as unknown as { id: string; app: AppKind }[];
     if (await names.refresh(known)) {
+      board.confirmLegacyClaudeTitles();
       board.emit("projects");
       inbox.emit("sessions");
     }

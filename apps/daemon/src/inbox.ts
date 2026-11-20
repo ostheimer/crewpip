@@ -70,8 +70,8 @@ interface MessageRow {
 const HUMAN_NAME = /^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,63}$/u;
 
 /** Woher der Anzeigename stammt. Ein stärkerer Wert wird nie von einem schwächeren überschrieben. */
-export type NameSource = "auto" | "registry" | "cli-user" | "user";
-const NAME_RANK: Record<NameSource, number> = { auto: 0, registry: 1, "cli-user": 2, user: 3 };
+export type NameSource = "auto" | "registry" | "cli-user" | "user" | "override";
+const NAME_RANK: Record<NameSource, number> = { auto: 0, registry: 1, "cli-user": 2, user: 3, override: 3 };
 
 /** Sessions, die nur über einen MCP-Aufruf bekannt sind, weil kein Hook sie angemeldet hat. */
 const PLACEHOLDER_PREFIX = "mcp-";
@@ -246,7 +246,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
     const project = proj.name;
     const worktree = path.resolve(s.cwd) === proj.root ? null : path.basename(path.resolve(s.cwd));
     const name = s.name?.trim() || null;
-    const source: NameSource = name ? (s.nameSource ?? "user") : "auto";
+    const source: NameSource = name ? (s.nameSource ?? "override") : "auto";
     const role = s.role !== undefined ? s.role : name ? roleFromName(name) : null;
     if (!existing) {
       const started = s.startedAt ?? now;
@@ -258,7 +258,8 @@ export class Inbox extends EventEmitter<InboxEvents> {
         .run(s.id, s.app, project, worktree, proj.id, s.cwd, name ?? `Session ${timeLabel(started)}`, source, s.runId ?? null, s.pid ?? null, s.status ?? "idle", started, s.touch === false ? started : now);
     } else {
       // Der Name wird nur übernommen, wenn seine Quelle mindestens so stark ist wie die bisherige.
-      const keepName = !name || NAME_RANK[source] < NAME_RANK[existing.name_source];
+      const confirmedLegacy = s.app === "claude" && source === "cli-user" && existing.name_source === "user" && name === existing.name;
+      const keepName = !name || (!confirmedLegacy && NAME_RANK[source] < NAME_RANK[existing.name_source]);
       nameApplied = !keepName;
       this.db
         .prepare(
@@ -336,7 +337,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
   renameSession(id: string, name: string): Session {
     const clean = name.trim();
     if (!clean) throw new Error("Leerer Name");
-    this.db.prepare("UPDATE sessions SET name = ?, name_source = 'user' WHERE id = ?").run(clean, id);
+    this.db.prepare("UPDATE sessions SET name = ?, name_source = 'override' WHERE id = ?").run(clean, id);
     const derived = roleFromName(clean);
     if (derived) this.setRole(id, derived);
     const row = this.sessionRow(id);

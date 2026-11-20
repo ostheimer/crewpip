@@ -107,8 +107,19 @@ export class Board extends EventEmitter<BoardEvents> {
   private nativeTitle(s: Pick<DisplayRow, "id" | "app" | "name" | "name_source">): string | undefined {
     const name = this.names?.titles.get(`${s.app}:${s.id}`);
     if (this.names && s.app === "claude" && (s.name_source === "registry" || s.name_source === "cli-user")) return name ?? s.name;
-    if (this.names && s.app === "claude" && s.name_source === "user") return s.name;
-    return name && s.name_source === "user" ? s.name : name;
+    if (this.names && (s.app === "claude" || s.app === "codex") && (s.name_source === "user" || s.name_source === "override")) return s.name;
+    return name;
+  }
+
+  /** Vor der Trennung der Quellen hieß auch ein CLI-/rename 'user'. Nur bei identischem
+   * Desktop-Titel lässt sich dieser Altbestand als nativ behandeln. Abweichende Aliase bleiben. */
+  confirmLegacyClaudeTitles(): void {
+    if (!this.names) return;
+    const old = this.db.prepare("SELECT id, name FROM sessions WHERE app = 'claude' AND name_source = 'user'").all();
+    const confirm = this.db.prepare("UPDATE sessions SET name_source = 'cli-user' WHERE id = ? AND name_source = 'user' AND name = ?");
+    for (const { id, name } of old) {
+      if (typeof id === "string" && typeof name === "string" && this.names.titles.get(`claude:${id}`) === name) confirm.run(id, name);
+    }
   }
 
   private standalone(root: string): boolean {
