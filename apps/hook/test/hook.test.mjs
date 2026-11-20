@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { formatOutput, callDaemon, sessionIdOf, renderMessages } from "../crewpip-hook.mjs";
+import { formatOutput, callDaemon, sessionIdOf, cwdOf, renderMessages } from "../crewpip-hook.mjs";
 
 const script = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../crewpip-hook.mjs");
 const msgs = [{ id: 7, from: { kind: "session", label: "Codex · example-project / Thread 14:02" }, toLabel: "Claude · example-project / api-worker", replyTo: "session:x1", text: "hi", createdAt: "2026-09-01T10:00:00Z" }];
@@ -66,4 +66,52 @@ test("Sitzungsschlüssel bei stop nur mit Nachrichten, nie allein (Aufgabe #46)"
   assert.match(mit.reason, /hi/, "die Nachricht selbst bleibt erhalten");
   // Beim Ende des Chats nützt der Schlüssel nichts mehr.
   assert.equal(formatOutput("codex", "session-end", { messages: [], sessionKey: "k-ende" }), null);
+});
+
+test("Antigravity (#20): Gespräch über conversationId, Projekt über workspacePaths", () => {
+  const p = { conversationId: "ag-conv-1", workspacePaths: ["/p/ag-projekt", "/p/zweit"], lastUserInput: "Fix den Test" };
+  assert.equal(sessionIdOf("antigravity", p), "ag-conv-1");
+  assert.equal(cwdOf("antigravity", p, {}), "/p/ag-projekt");
+  // Antigravity 2.33 schickt zusätzlich cwd mit; das hat Vorrang.
+  assert.equal(cwdOf("antigravity", { ...p, cwd: "/p/echt" }, {}), "/p/echt");
+  assert.equal(cwdOf("antigravity", { conversationId: "x" }, {}), null, "ohne Projekt keine Anmeldung, nie ~/.gemini/config");
+});
+
+test("Antigravity (#20): Ausgabe als injectSteps bzw. Stop mit continue", () => {
+  assert.equal(formatOutput("antigravity", "prompt", { messages: [] }), null);
+  const start = formatOutput("antigravity", "session-start", { messages: msgs });
+  assert.equal(start.injectSteps.length, 1);
+  assert.match(JSON.stringify(start.injectSteps[0]), /antworten an: session:x1/);
+  const pre = formatOutput("antigravity", "prompt", { messages: msgs, sessionKey: "k1" });
+  assert.match(JSON.stringify(pre.injectSteps), /Sitzungsschlüssel: k1/);
+  assert.equal(pre.terminationBehavior, undefined, "nie abbrechen");
+  const stop = formatOutput("antigravity", "stop", { messages: msgs });
+  assert.deepEqual(Object.keys(stop), ["decision", "reason"]);
+  assert.equal(stop.decision, "continue");
+  assert.equal(formatOutput("antigravity", "stop", { messages: [], sessionKey: "k" }), null, "leerer Stop setzt nicht fort");
+});
+
+test("Antigravity (#20): callDaemon schickt Turn-Merkmal aus lastUserInput, nicht den Text", async () => {
+  let seen;
+  const fetchImpl = async (url, init) => { seen = { url, body: JSON.parse(init.body) }; return { ok: true, json: async () => ({ session: null, messages: [], mayContinue: true }) }; };
+  const payload = { conversationId: "c1", workspacePaths: ["/p/x"], lastUserInput: "geheimer Prompt", invocationNum: 2 };
+  await callDaemon({ app: "antigravity", event: "prompt", payload, env: {}, fetchImpl });
+  assert.equal(seen.url, "http://127.0.0.1:7357/hooks/antigravity/prompt");
+  assert.equal(seen.body.sessionId, "c1");
+  assert.equal(seen.body.cwd, "/p/x");
+  assert.equal(typeof seen.body.turn, "string");
+  assert.ok(!JSON.stringify(seen.body).includes("geheimer Prompt"), "Prompt-Text verlässt den Hook nicht");
+  const t1 = seen.body.turn;
+  await callDaemon({ app: "antigravity", event: "prompt", payload: { ...payload, invocationNum: 5 }, env: {}, fetchImpl });
+  assert.equal(seen.body.turn, t1, "gleicher Prompt, gleicher Turn");
+  await callDaemon({ app: "antigravity", event: "prompt", payload: { ...payload, lastUserInput: "neu" }, env: {}, fetchImpl });
+  assert.notEqual(seen.body.turn, t1);
+  await callDaemon({ app: "claude", event: "prompt", payload: { session_id: "s", cwd: "/p" }, env: {}, fetchImpl });
+  assert.equal(seen.body.turn ?? null, null, "andere Apps ohne Turn-Merkmal");
+});
+
+test("Antigravity (#20): Skript akzeptiert die App und endet still ohne Daemon", () => {
+  const r = spawnSync("node", [script, "antigravity", "prompt"], { input: JSON.stringify({ conversationId: "c", workspacePaths: ["/p"] }), env: { ...process.env, CREWPIP_URL: "http://127.0.0.1:1", CREWPIP_HOOK_TIMEOUT_MS: "500" }, encoding: "utf8" });
+  assert.equal(r.status, 0);
+  assert.equal(r.stdout, "");
 });

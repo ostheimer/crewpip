@@ -1,5 +1,5 @@
 /**
- * Gibt die Konfigurationsschnipsel für Claude Code, Cursor und Codex aus.
+ * Gibt die Konfigurationsschnipsel für Claude Code, Cursor, Codex und Antigravity aus.
  * `pnpm snippets` druckt sie, `pnpm snippets --write` legt sie unter config/generated/ ab.
  * Globale Konfigurationsdateien werden nie automatisch verändert.
  */
@@ -76,6 +76,31 @@ export const snippets = {
       `x-crewpip-token = "${token}"`,
       "",
     ].join("\n"),
+  },
+  antigravityMcp: {
+    // Antigravity spricht entfernte Server nur über Streamable HTTP an (serverUrl, headers).
+    file: "~/.gemini/config/mcp_config.json (in mcpServers einfügen); gilt für App, IDE und CLI",
+    content: JSON.stringify(
+      { mcpServers: { crewpip: { serverUrl: `${url}/mcp/antigravity?app=antigravity`, headers: { "x-crewpip-token": token } } } },
+      null,
+      2,
+    ),
+  },
+  antigravityHooks: {
+    // Oberste Ebene: frei benannte Hook-Definitionen. SessionStart, PreInvocation und Stop sind
+    // flache Listen ohne matcher und ohne hooks-Zwischenebene. Ein SessionEnd gibt es nicht.
+    file: "~/.gemini/config/hooks.json (Eintrag crewpip einfügen); in der App unter Settings › Customizations › Hooks sichtbar",
+    content: JSON.stringify(
+      {
+        crewpip: {
+          SessionStart: [{ type: "command", command: hookCmd("antigravity", "session-start"), timeout: 5 }],
+          PreInvocation: [{ type: "command", command: hookCmd("antigravity", "prompt"), timeout: 5 }],
+          Stop: [{ type: "command", command: hookCmd("antigravity", "stop"), timeout: 5 }],
+        },
+      },
+      null,
+      2,
+    ),
   },
   codexHooks: {
     // SessionEnd lässt Codex höchstens 3 s zu und kürzt größere Werte mit einer Warnung.

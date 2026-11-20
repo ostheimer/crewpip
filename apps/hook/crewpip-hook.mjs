@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 /**
- * CrewPip-Hook für Claude Code, Cursor und Codex.
+ * CrewPip-Hook für Claude Code, Cursor, Codex und Antigravity.
  *
- *   node crewpip-hook.mjs <claude|cursor|codex> <session-start|prompt|stop|session-end>
+ *   node crewpip-hook.mjs <claude|cursor|codex|antigravity> <session-start|prompt|stop|session-end>
+ *
+ * Antigravity kennt kein UserPromptSubmit; dort hängt "prompt" an PreInvocation, das vor jedem
+ * Modellaufruf feuert. Doppelte Zustellung verhindert der Daemon über den Zustellnachweis.
  *
  * Liest das Hook-Payload der App von stdin, meldet es dem Daemon und übersetzt die
  * Antwort in das Ausgabeformat der jeweiligen App. Läuft der Daemon nicht oder geht
@@ -14,12 +17,13 @@
  * CREWPIP_HOOK_DEBUG (Dateipfad: schreibt Eingabe, Anfrage und Antwort dorthin),
  * CREWPIP_TOKEN oder CREWPIP_TOKEN_FILE (Standard ~/.crewpip/token).
  */
+import { createHash } from "node:crypto";
 import { appendFileSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
 const [app, event] = process.argv.slice(2);
-const APPS = new Set(["claude", "cursor", "codex"]);
+const APPS = new Set(["claude", "cursor", "codex", "antigravity"]);
 const EVENTS = new Set(["session-start", "prompt", "stop", "session-end"]);
 
 /** Das Token liegt neben der Datenbank und ist nur für den Eigentümer lesbar. */
@@ -42,11 +46,15 @@ export function readStdinJson() {
 }
 
 export function sessionIdOf(app, payload) {
+  if (app === "antigravity") return payload.conversationId ?? null;
   if (app === "cursor") return payload.conversation_id ?? payload.session_id ?? null;
   return payload.session_id ?? null;
 }
 
 export function cwdOf(app, payload, env) {
+  // Antigravity 2.33 schickt cwd mit (gemessen 20.11.2026), die Doku nennt nur workspacePaths.
+  // Der Hook selbst läuft in ~/.gemini/config, process.cwd() taugt dort nicht als Projekt.
+  if (app === "antigravity") return payload.cwd ?? payload.workspacePaths?.[0] ?? null;
   if (app === "cursor") return payload.workspace_roots?.[0] ?? env.CURSOR_PROJECT_DIR ?? process.cwd();
   return payload.cwd ?? env.CLAUDE_PROJECT_DIR ?? process.cwd();
 }
@@ -77,6 +85,25 @@ export function renderSessionKey(key) {
   );
 }
 
+/**
+ * Merkmal des laufenden Turns: Prüfsumme des letzten menschlichen Prompts. PreInvocation feuert
+ * vor jedem Modellaufruf, auch nach einem Stop mit "continue"; der Daemon hebt die
+ * Schleifensperre nur auf, wenn sich dieses Merkmal ändert. Der Prompt selbst verlässt den Hook nicht.
+ */
+export function turnOf(app, payload) {
+  if (app !== "antigravity" || typeof payload.lastUserInput !== "string") return null;
+  return createHash("sha256").update(`${payload.conversationId ?? ""}\n${payload.lastUserInput}`).digest("hex").slice(0, 16);
+}
+
+/**
+ * Ein Schritt, den Antigravity in das Gespräch einspielt. Real geprüft am 20.11.2026: Ein
+ * userMessage erreicht das Modell, bleibt im Verlauf und ist für den Menschen sichtbar.
+ * ephemeralMessage wäre nur für einen Modellaufruf da, systemMessage ist in der Doku uneinheitlich.
+ */
+export function antigravityStep(text) {
+  return { userMessage: text };
+}
+
 /** Übersetzt die Daemon-Antwort in das Hook-Ausgabeformat der App. Gibt null zurück, wenn nichts auszugeben ist. */
 export function formatOutput(app, event, response) {
   const msgs = response?.messages ?? [];
@@ -87,6 +114,12 @@ export function formatOutput(app, event, response) {
   const key = schluesselErlaubt && response?.sessionKey ? response.sessionKey : null;
   if (!msgs.length && !key) return null;
   const text = [key ? renderSessionKey(key) : null, msgs.length ? renderMessages(msgs) : null].filter(Boolean).join("\n\n---\n\n");
+  if (app === "antigravity") {
+    if (event === "session-start" || event === "prompt") return { injectSteps: [antigravityStep(text)] };
+    // "continue" lässt den Agenten weiterlaufen; reason wird als Systemnachricht eingespielt.
+    if (event === "stop") return { decision: "continue", reason: text };
+    return null;
+  }
   if (app === "cursor") {
     if (event === "session-start") return { additional_context: text };
     if (event === "stop") return { followup_message: text };
@@ -114,6 +147,7 @@ export async function callDaemon({ app, event, payload, env, fetchImpl = fetch }
     cwd: cwdOf(app, payload, env),
     name: env.CREWPIP_SESSION_NAME ?? null,
     runId: env.CREWPIP_RUN ? Number(env.CREWPIP_RUN) : null,
+    turn: turnOf(app, payload),
     payload: { hook_event_name: payload.hook_event_name, stop_hook_active: payload.stop_hook_active, status: payload.status },
   };
   const token = readToken(env);

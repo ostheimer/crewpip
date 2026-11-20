@@ -43,6 +43,7 @@
   --claude-bg: #2a1f3f; --claude-fg: #e2d2ff;
   --codex-bg: #0f3b22; --codex-fg: #adf7c4;
   --cursor-bg: #3c2410; --cursor-fg: #ffd3ae;
+  --antigravity-bg: #13304a; --antigravity-fg: #bfe3ff;
   --human-bg: #1a2a1f; --human-fg: #c8e8d0;
   /* Rahmen und Glühen (nur für Rahmen, Überschriften, Hintergrund) */
   --frame: #2f9a4d;
@@ -80,6 +81,7 @@
   --claude-bg: #e6dcf0; --claude-fg: #4a2f73;
   --codex-bg: #cfe8d8; --codex-fg: #17502f;
   --cursor-bg: #f3d9c8; --cursor-fg: #7a2f10;
+  --antigravity-bg: #d3e6f5; --antigravity-fg: #12406a;
   --human-bg: #dfeadb; --human-fg: #2c4033;
   --frame: #2f7a45;
   --glow: none;
@@ -116,6 +118,7 @@
     --claude-bg: #e6dcf0; --claude-fg: #4a2f73;
     --codex-bg: #cfe8d8; --codex-fg: #17502f;
     --cursor-bg: #f3d9c8; --cursor-fg: #7a2f10;
+    --antigravity-bg: #d3e6f5; --antigravity-fg: #12406a;
     --human-bg: #dfeadb; --human-fg: #2c4033;
     --frame: #2f7a45;
     --glow: none;

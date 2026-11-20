@@ -23,7 +23,7 @@ import { createMcpServer } from "./mcp.js";
 import { createAuth, hostAllowed } from "./auth.js";
 import { systemProbe, type ProcessProbe } from "./peer.js";
 
-const APP_KINDS: AppKind[] = ["claude", "cursor", "codex", "other"];
+const APP_KINDS: AppKind[] = ["claude", "cursor", "codex", "antigravity", "other"];
 
 function appKind(v: unknown): AppKind {
   return APP_KINDS.includes(v as AppKind) ? (v as AppKind) : "other";
@@ -133,11 +133,15 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
         inbox.resetStopContinuations(session.id);
         response.messages = inbox.take(session.id, "hook-start");
         break;
-      case "prompt":
-        // Ein menschlicher Prompt hebt die Schleifensperre auf.
-        inbox.resetStopContinuations(session.id);
+      case "prompt": {
+        // Ein menschlicher Prompt hebt die Schleifensperre auf. Antigravity meldet "prompt" vor
+        // jedem Modellaufruf (PreInvocation), auch nach einem Stop mit "continue"; dort zählt
+        // nur ein neuer Turn, erkannt am Merkmal des letzten menschlichen Prompts.
+        const turn = typeof body.turn === "string" && body.turn ? body.turn : null;
+        if (inbox.newTurn(session.id, turn)) inbox.resetStopContinuations(session.id);
         response.messages = inbox.take(session.id, "hook-prompt");
         break;
+      }
       case "stop": {
         const pending = inbox.pendingFor(session.id);
         if (pending.length) {

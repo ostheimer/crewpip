@@ -22,6 +22,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font-size: 14px; }
 .app-claude { background: var(--claude-bg); color: var(--claude-fg); }
 .app-codex { background: var(--codex-bg); color: var(--codex-fg); }
 .app-cursor { background: var(--cursor-bg); color: var(--cursor-fg); }
+.app-antigravity { background: var(--antigravity-bg); color: var(--antigravity-fg); }
 .app-other, .app-human { background: var(--human-bg); color: var(--human-fg); }
 .role-director { background: var(--accent-bg); color: var(--accent); }
 .role-pm { background: var(--codex-bg); color: var(--codex-fg); }
@@ -558,6 +559,7 @@ input, select, textarea { border-radius: 2px; border: 1px solid var(--border-str
 .graph-node > g > * { stroke-width: 2; }
 .graph-node.app-claude > g > * { fill: var(--claude-bg); stroke: var(--claude-fg); }
 .graph-node.app-codex > g > * { fill: var(--codex-bg); stroke: var(--codex-fg); }
+.graph-node.app-antigravity > g > * { fill: var(--antigravity-bg); stroke: var(--antigravity-fg); }
 .graph-node.app-cursor > g > *, .graph-node.app-other > g > * { fill: var(--panel); stroke: var(--text); }
 .graph-node.conn-no-hook > g > *, .graph-node.conn-stale > g > * { stroke-dasharray: 3 2; }
 .graph-edge path { fill: none; stroke: var(--attention-line); stroke-width: 2; }

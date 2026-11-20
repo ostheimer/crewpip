@@ -27,7 +27,8 @@ Nachrichten austauschen, zeigen die Übersicht im Board und die Zustellnachweise
   legt er Post ab, mit `read_inbox` holt er sie selbst ab, mit `wait_for_message` wartet er auf
   neue Post, mit `list_sessions` sieht er die Adressen der anderen Chats
   (`apps/daemon/src/mcp.ts`).
-- **Hooks.** Die App startet bei Sitzungsstart, Prompt (nicht bei Cursor), Turn-Ende und Sitzungsende das Skript
+- **Hooks.** Die App startet bei Sitzungsstart, Prompt (nicht bei Cursor; bei Antigravity vor jedem
+  Modellaufruf), Turn-Ende und Sitzungsende (nicht bei Antigravity) das Skript
   `apps/hook/crewpip-hook.mjs`. Es meldet den Chat an (`/hooks/<app>/<ereignis>` in
   `apps/daemon/src/http.ts`) und bringt wartende Post in den Chat. Nur der Hook stellt Post von
   selbst zu.
@@ -38,14 +39,14 @@ Post kommt nur an, wenn im Empfänger-Chat etwas passiert oder er selbst nachsie
 eine App bekommt, steht in `apps/daemon/src/setup.ts`, wie die Post in den Chat kommt, in
 `formatOutput` (`apps/hook/crewpip-hook.mjs`).
 
-| Weg | Claude Code | Codex | Cursor |
-|---|---|---|---|
-| Hinterlassen | `post_message` | `post_message` | `post_message` |
-| Beim Sitzungsstart | SessionStart-Hook | SessionStart-Hook | sessionStart-Hook |
-| Beim nächsten Prompt | UserPromptSubmit-Hook | UserPromptSubmit-Hook | nein, nur beim Sitzungsstart |
-| Am Turn-Ende | Stop-Hook, der Chat arbeitet mit der Post weiter | Stop-Hook, der Chat arbeitet mit der Post weiter | stop-Hook mit `followup_message` |
-| Selbst abholen | `read_inbox` | `read_inbox` | `read_inbox` |
-| Aktiv warten | `wait_for_message`, bis 50 s je Aufruf | ebenso | ebenso |
+| Weg | Claude Code | Codex | Cursor | Antigravity |
+|---|---|---|---|---|
+| Hinterlassen | `post_message` | `post_message` | `post_message` | `post_message` |
+| Beim Sitzungsstart | SessionStart-Hook | SessionStart-Hook | sessionStart-Hook | SessionStart-Hook |
+| Beim nächsten Prompt | UserPromptSubmit-Hook | UserPromptSubmit-Hook | nein, nur beim Sitzungsstart | PreInvocation-Hook vor dem Modellaufruf, jede Nachricht nur einmal |
+| Am Turn-Ende | Stop-Hook, der Chat arbeitet mit der Post weiter | Stop-Hook, der Chat arbeitet mit der Post weiter | stop-Hook mit `followup_message` | Stop-Hook mit `continue`, der Chat arbeitet mit der Post weiter |
+| Selbst abholen | `read_inbox` | `read_inbox` | `read_inbox` | `read_inbox` |
+| Aktiv warten | `wait_for_message`, bis 50 s je Aufruf | ebenso | ebenso | ebenso |
 
 Die Wartezeit von `wait_for_message` begrenzt `CREWPIP_MAX_WAIT_SECONDS` (Standard 50 s, ohne
 Angabe 25 s). Jede Abholung wird als Zustellung mit Weg und Zeit gespeichert; das Board zeigt sie
@@ -83,7 +84,8 @@ genaue Regel steht in [verbindung.md](verbindung.md).
 
 1. Im CrewPip-Ordner `pnpm snippets --write` ausführen.
 2. Die Hook-Einträge für die App aus `config/generated/` übernehmen. Bei Codex danach `/hooks`
-   ausführen und die vier CrewPip-Hooks freigeben.
+   ausführen und die vier CrewPip-Hooks freigeben. Bei Antigravity gehören sie in
+   `~/.gemini/config/hooks.json`, die MCP-Verbindung in `~/.gemini/config/mcp_config.json`.
 3. Den Chat neu starten und einen Prompt eingeben (Cursor: einen neuen Chat beginnen). Danach
    steht er auf „Post kommt an“.
 
@@ -91,8 +93,9 @@ genaue Regel steht in [verbindung.md](verbindung.md).
 
 Unter „Chats an CrewPip“ zeigt das Board je Repo einen Stern: CrewPip in der Mitte, jeder Chat
 als Speiche (durchgezogen = Post kommt an, gestrichelt = ohne Hook oder veraltet). Die Form
-steht für die App (Kreis Claude, Quadrat Codex, Dreieck Cursor), dazu immer der Name. Eigene,
-neutrale Symbole; Logos von Anthropic und OpenAI werden nicht verwendet.
+steht für die App (Kreis Claude, Quadrat Codex, Dreieck Cursor, Sechseck Antigravity), dazu
+immer der Name. Eigene, neutrale Symbole; Logos von Anthropic, OpenAI, Anysphere und Google
+werden nicht verwendet.
 
 Bögen zwischen zwei Chats und die Liste „Nachrichtenwege der letzten 24 Stunden“ zeigen, wer
 tatsächlich Post ausgetauscht hat: Absender, Empfänger, Anzahl und letzter Zeitpunkt, nie den
@@ -113,6 +116,14 @@ den Chat, der sie abgeholt hat. Nicht abgeholte Post erscheint nicht.
   `codex`-Prozess. Arbeiten zwei im selben Ordner, unterscheidet CrewPip sie über einen
   Sitzungsschlüssel, den nur der Hook des jeweiligen Threads erfährt. Ein Thread, der ohne
   Sitzungsende verschwindet, gilt als verbunden, solange die App läuft.
+- **Antigravity: ein Prozess, kein Sitzungsende.** Alle Gespräche der Antigravity-App laufen
+  über einen `language_server`-Prozess, und die Hooks aus `~/.gemini/config/hooks.json` gelten
+  für App, IDE und CLI gemeinsam. Antigravity hat kein UserPromptSubmit: Der PreInvocation-Hook
+  feuert vor jedem Modellaufruf, auch mitten im Turn; der Zustellnachweis sorgt dafür, dass jede
+  Nachricht nur einmal ankommt. Die Schleifensperre hebt nur ein neuer menschlicher Prompt auf,
+  nicht der erneute Modellaufruf nach einer Fortsetzung. Ein Gespräch meldet sich nie ab und
+  gilt als verbunden, solange die App läuft. Arbeiten zwei Gespräche im selben Ordner, trennt
+  sie der Sitzungsschlüssel.
 - **Nur dieser Mac.** Jeder Rechner hat sein eigenes Board. Chats auf zwei Rechnern erreichen
   einander nicht.
 - **Ohne Dienst keine Post.** Läuft der Dienst nicht, beendet sich der Hook still mit Exit 0.

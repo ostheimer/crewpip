@@ -674,6 +674,17 @@ export class Inbox extends EventEmitter<InboxEvents> {
     return true;
   }
 
+  /** Letztes Turn-Merkmal je Session (nur Antigravity). Flüchtig: nach einem Neustart zählt der nächste Prompt als neuer Turn. */
+  private readonly turns = new Map<string, string>();
+
+  /** Beginnt mit diesem Merkmal ein neuer Turn? Ohne Merkmal ist jeder Prompt ein neuer Turn. */
+  newTurn(sessionId: string, turn: string | null): boolean {
+    if (!turn) return true;
+    if (this.turns.get(sessionId) === turn) return false;
+    this.turns.set(sessionId, turn);
+    return true;
+  }
+
   resetStopContinuations(sessionId: string): void {
     this.db.prepare("UPDATE sessions SET stop_continuations = 0 WHERE id = ?").run(sessionId);
   }

@@ -69,7 +69,7 @@ function renderSessions(all: Session[], self: Session | null): string {
   }
   lines.push(
     "",
-    "Weitere Ziele: all, app:claude, app:cursor, app:codex, human:<name>.",
+    "Weitere Ziele: all, app:claude, app:cursor, app:codex, app:antigravity, human:<name>.",
     "pm:<projekt> und director folgen der Rolle, nicht der Sitzung: Sie erreichen auch den,",
     "der die Rolle erst später übernimmt, und überstehen einen Neustart.",
     "verbindung=ohne-hook oder veraltet: Post erreicht diesen Chat nicht von selbst (docs/verbindung.md).",
@@ -149,7 +149,7 @@ export function createMcpServer(
       description:
         "Hinterlässt eine Nachricht für andere Sessions oder Menschen. Ziel (to): " +
         '"session:<id>" (eine bestimmte Session, ids über list_sessions), "project:<name>" (alle Sessions eines Projekts), ' +
-        '"app:claude|cursor|codex", "pm:<projekt>" (wer dort gerade PM ist), "director", "all", oder "human:<name>". ' +
+        '"app:claude|cursor|codex|antigravity", "pm:<projekt>" (wer dort gerade PM ist), "director", "all", oder "human:<name>". ' +
         'Zum Antworten den Wert aus "antworten an" verwenden.',
       inputSchema: { cwd: cwdParam, session_key: keyParam, to: z.string().min(1), text: z.string().min(1).describe("Nachrichtentext, Markdown erlaubt") },
     },
