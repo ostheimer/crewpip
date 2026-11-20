@@ -118,6 +118,51 @@ function pidAlive(pid: number): boolean {
 }
 
 /**
+ * Was die Claude-Registry über den laufenden Prozess einer Session weiß. Nur im Speicher:
+ * der Registry-Abgleich liefert es nach einem Neustart des Daemons sofort wieder.
+ */
+export interface ProcActivity {
+  pid: number;
+  /** Start des Prozesses (nicht der Session, die über mehrere Prozesse fortgesetzt sein kann) */
+  startedAt: string | null;
+  /** "busy" während eines Turns, sonst "idle" */
+  status: string | null;
+  /** Letzte Statusänderung */
+  statusAt: string | null;
+}
+
+/**
+ * Abstand, der zwischen Prozessstart, Turn-Ende und Bewertung mindestens liegen muss, damit
+ * ein fehlender Hook als „Neustart nötig“ gilt. Ein geladener Stop-Hook meldet sich am Ende
+ * jedes Turns; die Frist deckt seinen Weg zum Daemon (Zeitlimit 5 s) und das Ermitteln der
+ * Prozesskette ab.
+ */
+export const HOOK_GRACE_MS = 10_000;
+
+/**
+ * Hat der Prozess seit seinem Start einen Turn beendet, ohne dass ein Hook aus ihm kam?
+ * Dann hat er die CrewPip-Hooks nicht geladen. Claude Code liest die Hook-Liste beim Start
+ * des Prozesses; eine spätere Änderung an ~/.claude/settings.json übernehmen laufende
+ * Prozesse nicht verlässlich (Befund #21: 10 von 21 laufenden Chats nie).
+ */
+function turnWithoutHook(a: ProcActivity | null | undefined, now: number): boolean {
+  if (!a || a.status !== "idle" || !a.startedAt || !a.statusAt) return false;
+  const started = Date.parse(a.startedAt);
+  const changed = Date.parse(a.statusAt);
+  if (Number.isNaN(started) || Number.isNaN(changed)) return false;
+  return changed - started >= HOOK_GRACE_MS && now - changed >= HOOK_GRACE_MS;
+}
+
+/** Kam der zuletzt gespeicherte Hook aus dem Prozess, der jetzt läuft? */
+function hookFromCurrentProcess(r: Pick<SessionRow, "pid" | "proc_chain">): boolean {
+  const chain = chainOf(r);
+  if (!chain.length) return false;
+  // Claude: Die Registry nennt den laufenden Prozess. Setzt die App eine Session in einem
+  // neuen Prozess fort, stammt eine gespeicherte Kette sonst noch vom alten.
+  return r.pid === null || chain.some((p) => p.pid === r.pid);
+}
+
+/**
  * Verbindungsregel (docs/verbindung.md). Der Hook ist das einzige, was einem Chat Post von
  * selbst zustellt; eine gespeicherte Prozesskette gibt es nur, wenn er sich gemeldet hat.
  * Lebt der Prozess, gilt der Chat als verbunden, gleich wie lange er schon ruht: Claude
@@ -128,6 +173,8 @@ function pidAlive(pid: number): boolean {
 export function connectionOf(
   r: Pick<SessionRow, "id" | "pid" | "proc_chain" | "ended_at">,
   alive: (pid: number) => boolean = pidAlive,
+  activity?: ProcActivity | null,
+  now: number = Date.now(),
 ): ConnectionState {
   if (r.ended_at) return "ended";
   if (r.id.startsWith(PLACEHOLDER_PREFIX)) return "no-hook";
@@ -135,8 +182,8 @@ export function connectionOf(
   // Claude: die PID aus der Registry ist maßgeblich; sonst der Agent über dem Hook.
   const pid = r.pid ?? chain[0]?.pid ?? null;
   if (pid !== null && !alive(pid)) return "stale";
-  if (!chain.length) return "no-hook";
-  return "connected";
+  if (hookFromCurrentProcess(r)) return "connected";
+  return activity && activity.pid === r.pid && turnWithoutHook(activity, now) ? "restart-needed" : "no-hook";
 }
 
 /** Dieselben dynamischen Ziele gelten für Posteingang und die lesende Chatansicht. */
@@ -180,6 +227,14 @@ export function targetLabel(t: Target, resolveSession?: (id: string) => string |
  * was sie schon gesehen hat, und Wartende aufwecken.
  */
 export class Inbox extends EventEmitter<InboxEvents> {
+  /** Prozesszustand je Claude-Session laut Registry; siehe ProcActivity. */
+  private readonly activity = new Map<string, ProcActivity>();
+  /**
+   * Letzter Hook-Aufruf je Session (nur im Speicher). Ein angekommener Hook beweist, dass der
+   * Prozess die Hooks geladen hat, auch wenn sich seine Prozesskette nicht ermitteln ließ.
+   */
+  private readonly hookAt = new Map<string, string>();
+
   constructor(
     private readonly db: DatabaseSync,
     private readonly board: Board,
@@ -203,7 +258,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
       cwd: r.cwd,
       ...this.board.sessionDisplay(r),
       status: r.ended_at ? "ended" : r.status,
-      connection: connectionOf(r),
+      connection: connectionOf(r, undefined, this.activityWithoutHook(r.id)),
       startedAt: r.started_at,
       lastSeenAt: r.last_seen_at,
       endedAt: r.ended_at,
@@ -215,6 +270,19 @@ export class Inbox extends EventEmitter<InboxEvents> {
         return t ? { id: t.id, title: t.title, status: t.status } : null;
       })(),
     };
+  }
+
+  /** Registry-Zustand des Prozesses, sofern seit dessen Start kein Hook von der Session kam. */
+  private activityWithoutHook(id: string): ProcActivity | undefined {
+    const a = this.activity.get(id);
+    const heard = this.hookAt.get(id);
+    if (a && heard && a.startedAt && heard >= a.startedAt) return undefined;
+    return a;
+  }
+
+  /** Vom Hook-Endpunkt bei jedem Aufruf gemeldet. */
+  noteHook(id: string): void {
+    this.hookAt.set(id, new Date().toISOString());
   }
 
   labelOf(id: string): string | null {
@@ -300,6 +368,10 @@ export class Inbox extends EventEmitter<InboxEvents> {
   registrySync(): { upsert(e: RegistryEntry): void; endMissing(livePids: number[]): number } {
     return {
       upsert: (e) => {
+        const before = this.activity.get(e.sessionId);
+        this.activity.set(e.sessionId, { pid: e.pid, startedAt: e.startedAt, status: e.status, statusAt: e.statusAt });
+        // Ein Statuswechsel kann den Verbindungszustand ändern, ohne dass sich die Zeile ändert.
+        if (before && (before.status !== e.status || before.statusAt !== e.statusAt) && this.sessionRow(e.sessionId)) this.emit("sessions");
         this.upsertSession({
           id: e.sessionId,
           app: "claude",
@@ -330,6 +402,8 @@ export class Inbox extends EventEmitter<InboxEvents> {
   }
 
   endSession(id: string): void {
+    this.activity.delete(id);
+    this.hookAt.delete(id);
     this.db.prepare("UPDATE sessions SET ended_at = ?, status = 'ended' WHERE id = ? AND ended_at IS NULL").run(new Date().toISOString(), id);
     this.emit("sessions");
   }
@@ -382,10 +456,14 @@ export class Inbox extends EventEmitter<InboxEvents> {
     this.db.prepare("UPDATE sessions SET proc_chain = ? WHERE id = ?").run(JSON.stringify(chain), id);
   }
 
-  /** Lebt der Agent-Prozess, den der Hook zuletzt gemeldet hat? Ohne Eintrag: nein. */
+  /**
+   * Lebt der Agent-Prozess, den der Hook zuletzt gemeldet hat, und ist es der laufende Prozess
+   * der Session? Ohne Eintrag: nein. Nein heißt: der nächste Hook ermittelt die Kette neu.
+   */
   procChainAlive(id: string): boolean {
-    const head = chainOf(this.sessionRow(id))[0];
-    return !!head && pidAlive(head.pid);
+    const row = this.sessionRow(id);
+    const head = chainOf(row)[0];
+    return !!row && !!head && pidAlive(head.pid) && hookFromCurrentProcess(row);
   }
 
   /**

@@ -3,7 +3,7 @@ import type { AppKind, ConnectionState, Project, Session } from "@crewpip/shared
 /** Feste Reihenfolge der Spalten; es erscheinen nur Apps, die auf diesem Mac vorkommen. */
 export const APP_ORDER: AppKind[] = ["claude", "codex", "cursor", "antigravity", "other"];
 
-const STATE_ORDER: Record<ConnectionState, number> = { connected: 0, "no-hook": 1, stale: 2, ended: 3 };
+const STATE_ORDER: Record<ConnectionState, number> = { connected: 0, "no-hook": 1, "restart-needed": 2, stale: 3, ended: 4 };
 
 export interface MatrixRow {
   id: string;
@@ -54,7 +54,7 @@ export function buildMatrix(sessions: Session[], projects: Project[], projectId:
     return {
       id, name: g.name, cells, sessions: sorted, pm, director: localDirector ?? director,
       connected: sorted.filter(s => s.connection === "connected").length,
-      alert: [pm, localDirector].some(h => h?.connection === "no-hook"),
+      alert: [pm, localDirector].some(h => h?.connection === "no-hook" || h?.connection === "restart-needed"),
     };
   }).sort((a, b) => a.name.localeCompare(b.name));
   const present = new Set(rows.flatMap(r => r.sessions.map(s => s.app)));

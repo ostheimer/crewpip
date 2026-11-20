@@ -21,6 +21,13 @@ export interface RegistryEntry {
   /** "derived" | "auto" | "collision" | "user" | "peer" — "user" heißt: per /rename gesetzt */
   nameSource: string | null;
   startedAt: string | null;
+  /**
+   * Zustand des Prozesses laut Claude Code ("busy" während eines Turns, sonst "idle") und
+   * wann er sich zuletzt geändert hat. Gemessen an 2.1.325/2.1.326 (20.11.2026). Fehlt bei
+   * älteren Versionen; dann bleibt „Neustart nötig“ unerkannt (#21).
+   */
+  status: string | null;
+  statusAt: string | null;
 }
 
 export function registryDir(): string {
@@ -62,6 +69,8 @@ export function readClaudeRegistry(dir = registryDir()): RegistryEntry[] {
         name: typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : null,
         nameSource: typeof raw.nameSource === "string" ? raw.nameSource : null,
         startedAt: typeof raw.startedAt === "number" ? new Date(raw.startedAt).toISOString() : null,
+        status: typeof raw.status === "string" ? raw.status : null,
+        statusAt: typeof raw.statusUpdatedAt === "number" ? new Date(raw.statusUpdatedAt).toISOString() : null,
       });
     } catch {
       // Datei halb geschrieben oder unlesbar: überspringen, beim nächsten Durchlauf erneut versuchen.

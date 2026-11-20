@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- Chats melden sich selbständig an (Issue #21): Claude-Chats, die laufen und Turns hatten, aber nie einen Hook geschickt haben, stehen jetzt auf „Neustart nötig“ statt auf „Ohne Hook“ (Ursache: Claude Code liest Hooks beim Start; Chats, die vor der Einrichtung liefen, übernahmen sie teils nie, siehe `docs/verbindung.md`). Eine Prozesskette aus einem früheren Prozess derselben Session gilt nicht mehr als Verbindung. Fehlgeschlagene Hook-Aufrufe stehen ohne Inhalte und Token in `~/.crewpip/hook-errors.log`; der Daemon protokolliert abgelehnte und verworfene Hook-Aufrufe.
 - Seitenleiste bei niedrigem Fenster (Issue #14): Projektliste zeigt bei 800 x 600 mindestens sechs Zeilen, die Leiste scrollt als Ganzes, Sprach-/Darstellungsauswahl und Hilfe bleiben erreichbar. Neuer Browser-Test `apps/daemon/test/browser/sidebar-layout.ts`.
 
 - Dashboard im Retro-Terminal-Stil (Issue #12) statt Steampunk: grüne Monochrom-Schrift auf dunklem Grund, Systemschrift Monospace, Bernstein für Warnungen, Auswahl System/Dunkel/Hell (Standard Dunkel). Fließtext mindestens 15 px, Glühen nur auf Rahmen und Überschriften, keine Animationen; Zustände zusätzlich über Symbole. Steampunk-Schriften entfernt. Keine Funktionsänderung.
