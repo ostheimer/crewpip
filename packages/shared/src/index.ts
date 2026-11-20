@@ -110,6 +110,10 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
 
 /** Ein Repository, in dem gearbeitet wird. Wurzel ist das Haupt-Repository, nie ein Worktree. */
 export interface Project {
+  /** Nativer Projektname. name bleibt die unveränderte CrewPip-Adresse. */
+  displayName?: string;
+  /** Einzelne native Chats in einem Arbeitsordner ohne eigenes App-Projekt. */
+  standaloneChats?: { id: string; name: string; app: AppKind }[];
   id: string;
   name: string;
   root: string;
@@ -179,7 +183,7 @@ export interface Session {
 
 /** Absender einer Nachricht. */
 export type Party =
-  | { kind: "session"; id: string; app: AppKind; project: string; worktree: string | null; name: string; label: string; role: SessionRole | null }
+  | { kind: "session"; id: string; app: AppKind; project: string; projectId?: string; worktree: string | null; name: string; label: string; role: SessionRole | null }
   | { kind: "human"; name: string; label: string };
 
 /**

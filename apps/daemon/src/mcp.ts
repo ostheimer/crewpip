@@ -54,16 +54,16 @@ const CONNECTION_WORDS: Record<Session["connection"], string> = { connected: "ve
 
 function renderSessions(all: Session[], self: Session | null): string {
   const byProject = new Map<string, Session[]>();
-  for (const s of all) byProject.set(s.project, [...(byProject.get(s.project) ?? []), s]);
+  for (const s of all) byProject.set(s.projectId, [...(byProject.get(s.projectId) ?? []), s]);
   const lines: string[] = [];
   for (const [project, sessions] of byProject) {
-    lines.push(`Projekt ${project}  (Ziel: project:${project})`);
+    lines.push(`Projekt ${sessions[0]!.project}  (Ziel: project:${project})`);
     for (const s of sessions) {
       lines.push(
         `  ${s.id === self?.id ? "*" : "-"} ${APP_LABELS[s.app]} / ${s.name}` +
           `${s.role ? `  [${ROLE_LABELS[s.role]}]` : ""}` +
           `${s.worktree ? `  worktree=${s.worktree}` : ""}  status=${s.status}  verbindung=${CONNECTION_WORDS[s.connection]}` +
-          `  Ziel: ${s.role === "director" ? "director" : s.role === "pm" ? `pm:${s.project}` : `session:${s.id}`}`,
+          `  Ziel: ${s.role === "director" ? "director" : s.role === "pm" ? `pm:${s.projectId}` : `session:${s.id}`}`,
       );
     }
   }

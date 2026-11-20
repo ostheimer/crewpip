@@ -64,15 +64,18 @@ test("Übersicht: Verbindung zu CrewPip, Anbieter erkennbar, Zustände erklärt,
   page.on("console", m => { if (m.type() === "error") consoleErrors.push(m.text()); });
   try {
     await page.goto(url);
-    const panel = page.getByRole("region", { name: "Chats an CrewPip" });
+    const panel = page.getByRole("region", { name: "Chats an CrewPip", exact: true });
     await panel.waitFor();
+    await panel.locator(".info-button").click();
     assert.match(await panel.innerText(), /nicht direkt mit anderen Chats/);
     assert.match(await page.locator(".connection").innerText(), /Board mit CrewPip verbunden/);
 
-    const alpha = panel.getByRole("group", { name: "demo-alpha" });
-    assert.match(await alpha.innerText(), /2 von 3 Chats mit CrewPip verbunden/);
+    const alpha = panel.locator('[data-repo="demo-alpha"]');
+    await alpha.locator(".repo-toggle").click();
+    assert.match(await alpha.locator(".repo-count").getAttribute("aria-label") ?? "", /2 von 3 Chats mit CrewPip verbunden/);
 
     // Grafik: Nabe CrewPip, jeder Chat als Speiche, Kante Codex → PM mit Anzahl.
+    await alpha.getByRole("button", { name: "Grafik anzeigen" }).click();
     const graph = alpha.getByRole("img");
     const label = await graph.getAttribute("aria-label");
     assert.match(label ?? "", /demo-alpha/);
@@ -103,7 +106,7 @@ test("Übersicht: Verbindung zu CrewPip, Anbieter erkennbar, Zustände erklärt,
     assert.notEqual(await shape(claudeMark), await shape(codexMark), "Claude und Codex mit unterschiedlicher Form");
 
     // Zustände mit Erklärung, per Tastatur erreichbar.
-    const nohook = alpha.locator(".conn-apps").getByRole("listitem").filter({ hasText: "Alter Arbeitschat" });
+    const nohook = alpha.locator(".conn-chat-list").getByRole("listitem").filter({ hasText: "Alter Arbeitschat" });
     assert.match(await nohook.innerText(), /Ohne Hook/);
     const state = nohook.locator(".conn-state");
     await state.focus();
@@ -114,15 +117,15 @@ test("Übersicht: Verbindung zu CrewPip, Anbieter erkennbar, Zustände erklärt,
     await page.keyboard.press("Escape");
     assert.equal(await tip.isVisible(), false, "Escape blendet die Erklärung aus");
     assert.equal(await alpha.locator(".graph-scroll").getAttribute("tabindex"), "0", "Grafik per Tastatur scrollbar");
-    const pm = alpha.locator(".conn-apps").getByRole("listitem").filter({ hasText: "PM demo-alpha" });
+    const pm = alpha.locator(".conn-chat-list").getByRole("listitem").filter({ hasText: "PM demo-alpha" });
     assert.match(await pm.innerText(), /Post kommt an/);
 
     if (process.env.CREWPIP_SCREENSHOT_DIR) await panel.screenshot({ path: `${process.env.CREWPIP_SCREENSHOT_DIR}/uebersicht-de.png` });
     await page.getByLabel("Sprache", { exact: true }).selectOption("en");
-    const en = page.getByRole("region", { name: "Chats on CrewPip" });
+    const en = page.getByRole("region", { name: "Chats on CrewPip", exact: true });
     await en.waitFor();
     assert.match(await en.innerText(), /Messages arrive/);
-    assert.match(await en.getByRole("group", { name: "demo-alpha" }).getByRole("list", { name: "Message paths in the last 24 hours" }).innerText(), /2 messages/);
+    assert.match(await en.locator('[data-repo="demo-alpha"]').getByRole("list", { name: "Message paths in the last 24 hours" }).innerText(), /2 messages/);
     assert.deepEqual(consoleErrors.filter(e => /key/i.test(e)), [], "keine doppelten React-Schlüssel");
   } finally { await page.close(); }
 });

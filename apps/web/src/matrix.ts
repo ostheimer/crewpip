@@ -35,10 +35,11 @@ const byQuality = (a: Session, b: Session) => STATE_ORDER[a.connection] - STATE_
 export function buildMatrix(sessions: Session[], projects: Project[], projectId: string | null): Matrix {
   const live = sessions.filter(s => s.connection !== "ended");
   const director = live.filter(s => s.role === "director").sort(byQuality)[0];
+  const projectNames = new Map(projects.map(p => [p.id, p.name]));
   const groups = new Map<string, { name: string; sessions: Session[] }>();
   for (const s of live) {
     if (projectId && s.projectId !== projectId) continue;
-    const g = groups.get(s.projectId) ?? { name: s.project, sessions: [] };
+    const g = groups.get(s.projectId) ?? { name: projectNames.get(s.projectId) ?? s.project, sessions: [] };
     g.sessions.push(s);
     groups.set(s.projectId, g);
   }
