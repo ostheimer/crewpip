@@ -1,11 +1,12 @@
 /** Gemeinsame Typen für Daemon, Hook-Skript und Web-UI. */
 
-export type AppKind = "claude" | "cursor" | "codex" | "other";
+export type AppKind = "claude" | "cursor" | "codex" | "antigravity" | "other";
 
 export const APP_LABELS: Record<AppKind, string> = {
   claude: "Claude",
   cursor: "Cursor",
   codex: "Codex",
+  antigravity: "Antigravity",
   other: "App",
 };
 
@@ -262,6 +263,13 @@ export interface HookRequest {
   name?: string | null;
   /** Nummer des Laufs aus CREWPIP_RUN, wenn CrewPip diese Session gestartet hat */
   runId?: number | null;
+  /**
+   * Nur Antigravity: false, wenn "prompt" ein weiterer Modellaufruf im selben Turn ist
+   * (PreInvocation mit invocationNum > 0). Dann bleibt die Schleifensperre stehen und der
+   * Sitzungsschlüssel wird nicht erneut eingespielt. Fehlt das Feld, ist jeder "prompt" ein
+   * menschlicher Prompt.
+   */
+  turnStart?: boolean | null;
   payload?: unknown;
 }
 
@@ -312,7 +320,7 @@ export function parseTarget(raw: string): Target {
       return { kind: "human", name: rest };
     default:
       throw new Error(
-        `Unbekanntes Ziel: "${raw}" (erlaubt: session:<id>, project:<name>, app:<claude|cursor|codex>, pm:<projekt>, director, human:<name>, all)`,
+        `Unbekanntes Ziel: "${raw}" (erlaubt: session:<id>, project:<name>, app:<claude|cursor|codex|antigravity>, pm:<projekt>, director, human:<name>, all)`,
       );
   }
 }

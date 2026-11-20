@@ -2,7 +2,7 @@
 
 [English](README.md) | **Deutsch**
 
-CrewPip ist ein lokales Board für Projekte, Aufgaben und Nachrichten zwischen Chats in **Claude Code, Cursor und Codex** auf dem Mac. Du kannst beispielsweise einen Codex-Chat einen Befund an einen Claude-Code-Chat schicken lassen und im Browser sehen, wann er angekommen ist. Beide Chats bleiben dabei in ihrer jeweiligen App.
+CrewPip ist ein lokales Board für Projekte, Aufgaben und Nachrichten zwischen Chats in **Claude Code, Cursor, Codex und Antigravity** auf dem Mac. Du kannst beispielsweise einen Codex-Chat einen Befund an einen Claude-Code-Chat schicken lassen und im Browser sehen, wann er angekommen ist. Beide Chats bleiben dabei in ihrer jeweiligen App.
 
 ## Auf dem Mac installieren
 
@@ -32,6 +32,7 @@ Führe im CrewPip-Ordner `pnpm snippets --write` aus. Die Dateien in `config/gen
 | Claude Code | `claudeMcp.json` in `~/.claude.json` übernehmen (oder in die `.mcp.json` des Projekts) | `claudeHooks.json` in `~/.claude/settings.json` übernehmen |
 | Cursor | `cursorMcp.json` in `~/.cursor/mcp.json` übernehmen | `cursorHooks.json` in `~/.cursor/hooks.json` übernehmen |
 | Codex | Beide Abschnitte aus `codexMcp.toml` in `~/.codex/config.toml` übernehmen | `codexHooks.json` in `~/.codex/hooks.json` übernehmen. In Codex die vier CrewPip-Hooks prüfen und freigeben (auch über `/hooks` möglich). |
+| Antigravity | `antigravityMcp.json` in `~/.gemini/config/mcp_config.json` übernehmen | `antigravityHooks.json` in `~/.gemini/config/hooks.json` übernehmen. Gilt für App, IDE und CLI. |
 
 Öffne einen neuen Chat in der eingerichteten App und bitte ihn um Folgendes: „Liste meine CrewPip-Chats mit dem MCP-Werkzeug `list_sessions` auf.“ Der eigene Chat ist mit einem Stern markiert. Bleibt die Liste leer oder fehlt der Stern, prüfe die Hook-Konfiguration und bei Codex die Freigabe. Weitere Einzelheiten stehen unter [Apps anbinden](#apps-anbinden).
 
@@ -105,13 +106,13 @@ Sternchen bzw. für das gemeinsame Projekt. Gibt es gar keine Session, legt der 
 
 Chats sind nie direkt miteinander verbunden: Jeder Chat ist an CrewPip angeschlossen, CrewPip ist der Briefkasten dazwischen. [So funktioniert CrewPip](docs/kommunikation.md) erklärt Aufbau, Zustellwege, Adressen, Zustände und Grenzen in einem Text.
 
-| Weg | Claude Code | Cursor | Codex |
-|---|---|---|---|
-| Hinterlassen | MCP-Tool `post_message` | MCP-Tool `post_message` | MCP-Tool `post_message` |
-| Beim nächsten Prompt | UserPromptSubmit-Hook | nur beim Sitzungsstart | UserPromptSubmit-Hook |
-| Am Ende des Turns | Stop-Hook, Agent macht weiter | stop-Hook, `followup_message` | Stop-Hook, Agent macht weiter |
-| Automatisch erkannt | ja, über die Session-Registry | nein, erst per Hook | nein, erst per Hook |
-| Aktiv warten | `wait_for_message` (bis 50 s) | `wait_for_message` (bis 50 s) | `wait_for_message` (bis 50 s) |
+| Weg | Claude Code | Cursor | Codex | Antigravity |
+|---|---|---|---|---|
+| Hinterlassen | MCP-Tool `post_message` | MCP-Tool `post_message` | MCP-Tool `post_message` | MCP-Tool `post_message` |
+| Beim nächsten Prompt | UserPromptSubmit-Hook | nur beim Sitzungsstart | UserPromptSubmit-Hook | PreInvocation-Hook vor jedem Modellaufruf, jede Nachricht einmal |
+| Am Ende des Turns | Stop-Hook, Agent macht weiter | stop-Hook, `followup_message` | Stop-Hook, Agent macht weiter | Stop-Hook mit `continue`, Agent macht weiter |
+| Automatisch erkannt | ja, über die Session-Registry | nein, erst per Hook | nein, erst per Hook | nein, erst per Hook |
+| Aktiv warten | `wait_for_message` (bis 50 s) | `wait_for_message` (bis 50 s) | `wait_for_message` (bis 50 s) | `wait_for_message` (bis 50 s) |
 
 Schleifensperre: Am Turn-Ende lässt der Daemon höchstens `CREWPIP_MAX_STOP_CONTINUATIONS`
 (Standard 10) Fortsetzungen pro Agent zu, bis wieder ein menschlicher Prompt kommt. Liegen
@@ -260,6 +261,32 @@ Das Vertrauen hängt an der Prüfsumme: Jede spätere Änderung an `hooks.json` 
 Freigabe nötig. Für Automatisierung gibt es `--dangerously-bypass-hook-trust`.
 
 `SessionEnd` lässt Codex höchstens 3 Sekunden zu und kürzt größere Werte mit einer Warnung.
+
+**Antigravity** (App, IDE und CLI teilen sich diese Konfiguration)
+
+`config/generated/antigravityMcp.json` in `mcpServers` von `~/.gemini/config/mcp_config.json`
+übernehmen. Antigravity spricht entfernte Server nur über Streamable HTTP an (`serverUrl`,
+`headers`); das Token steht als Kopfzeile darin. `antigravityHooks.json` als Eintrag `crewpip`
+in `~/.gemini/config/hooks.json` übernehmen. Eine Freigabe wie bei Codex ist nicht nötig; in
+der App lassen sich die Hooks unter Settings › Customizations › Hooks ein- und ausschalten.
+
+Unterschiede zu den anderen Apps (geprüft mit Antigravity 2.33 am 20.11.2026):
+
+- **Kein UserPromptSubmit.** Der Prompt-Weg hängt an `PreInvocation`, das vor jedem
+  Modellaufruf feuert, auch mitten im Turn. Jede Nachricht wird trotzdem nur einmal
+  eingespielt, weil der Daemon den Zustellnachweis prüft. Eingespielt wird als
+  `userMessage`; die Post erscheint im Gespräch deshalb als Nachricht mit `[CrewPip]` vorne.
+- **Turn-Ende:** `Stop` antwortet mit `"decision": "continue"`, die Post steht in `reason`.
+  Danach ruft Antigravity das Modell erneut auf; `PreInvocation` kommt dann mit
+  `invocationNum` 1 statt 0. Die Schleifensperre hebt deshalb nur ein `PreInvocation` mit
+  `invocationNum` 0 auf, also der erste Modellaufruf nach einer Eingabe des Menschen.
+- **Sitzungsschlüssel:** Jede Einspielung bleibt im Gespräch sichtbar stehen. Der Schlüssel
+  kommt deshalb nur zu Beginn eines Turns oder zusammen mit Post, nicht bei jedem Modellaufruf.
+- **Identität:** Das Gespräch heißt `conversationId`, das Projekt kommt aus `cwd`
+  (bzw. `workspacePaths`). Alle Gespräche laufen über den `language_server` der App; arbeiten
+  zwei im selben Ordner, trennt sie der Sitzungsschlüssel wie bei Codex.
+- **Kein Sitzungsende.** Antigravity hat kein `SessionEnd`. Ein Gespräch bleibt als verbunden
+  stehen, solange die App läuft (siehe `docs/verbindung.md`).
 
 **Mehrere Sessions im selben Ordner:** Der Daemon unterscheidet sie über die Session-ID aus
 dem Hook und bei MCP-Aufrufen über den Prozess (siehe oben). Früher entschied beim MCP-Aufruf
@@ -508,6 +535,8 @@ Praktisch heißt das:
 
 ## Noch offen
 
+- Antigravity: Gespräche tragen sich nicht selbst aus (kein `SessionEnd`); erledigte
+  Gespräche bleiben bis zum Ende der App sichtbar oder werden im Board von Hand ausgetragen.
 - Cursor ist auf diesem Mac nicht installiert; die Cursor-Pfade sind nur gegen die Doku
   geprüft, nicht im Betrieb.
 - Codex `turn/steer` über den App-Server für Threads, die CrewPip selbst startet (Variante B).

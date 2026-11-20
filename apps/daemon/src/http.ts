@@ -23,7 +23,7 @@ import { createMcpServer } from "./mcp.js";
 import { createAuth, hostAllowed } from "./auth.js";
 import { systemProbe, type ProcessProbe } from "./peer.js";
 
-const APP_KINDS: AppKind[] = ["claude", "cursor", "codex", "other"];
+const APP_KINDS: AppKind[] = ["claude", "cursor", "codex", "antigravity", "other"];
 
 function appKind(v: unknown): AppKind {
   return APP_KINDS.includes(v as AppKind) ? (v as AppKind) : "other";
@@ -128,14 +128,18 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
       }
     }
 
+    // Antigravity meldet "prompt" vor jedem Modellaufruf (PreInvocation); nur der erste nach einer
+    // Eingabe des Menschen ist ein neuer Turn.
+    const turnStart = body.turnStart !== false;
     switch (event) {
       case "session-start":
         inbox.resetStopContinuations(session.id);
         response.messages = inbox.take(session.id, "hook-start");
         break;
       case "prompt":
-        // Ein menschlicher Prompt hebt die Schleifensperre auf.
-        inbox.resetStopContinuations(session.id);
+        // Ein menschlicher Prompt hebt die Schleifensperre auf, ein weiterer Modellaufruf im
+        // selben Turn (auch nach einem Stop mit "continue") nicht.
+        if (turnStart) inbox.resetStopContinuations(session.id);
         response.messages = inbox.take(session.id, "hook-prompt");
         break;
       case "stop": {
@@ -165,8 +169,14 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
     // Post zugestellt wird; dann reist der Schlüssel mit. Ein Stop allein für den Schlüssel
     // wäre eine Schleife und bleibt ausgeschlossen. Bei Codex ist der Stop-Weg gemessen der
     // einzige, der ankommt (Befund des Codex-PM zu #46).
+    //
+    // Bei Antigravity feuert "prompt" vor jedem Modellaufruf und jeder Einspielung bleibt als
+    // sichtbare Nachricht im Gespräch. Der Schlüssel kommt dort deshalb nur zu Beginn eines
+    // Turns oder zusammen mit Post, wie bei den anderen Apps einmal je Prompt.
     const schluesselWeg =
-      event === "session-start" || event === "prompt" || (event === "stop" && response.messages.length > 0);
+      event === "session-start" ||
+      (event === "prompt" && (turnStart || response.messages.length > 0)) ||
+      (event === "stop" && response.messages.length > 0);
     if (schluesselWeg && inbox.needsSessionKey(session.id)) {
       response.sessionKey = inbox.sessionKey(session.id);
     }

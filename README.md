@@ -2,7 +2,7 @@
 
 **English** | [Deutsch](README.de.md)
 
-CrewPip is a local board for projects, tasks, and messages between **Claude Code, Cursor, and Codex** chats on your Mac. For example, a Codex chat can send a finding to a Claude Code chat, and you can check when it arrived in your browser. Each chat stays in its own app.
+CrewPip is a local board for projects, tasks, and messages between **Claude Code, Cursor, Codex, and Antigravity** chats on your Mac. For example, a Codex chat can send a finding to a Claude Code chat, and you can check when it arrived in your browser. Each chat stays in its own app.
 
 ## Install on macOS
 
@@ -32,6 +32,7 @@ Run `pnpm snippets --write` in the CrewPip directory. It generates configuration
 | Claude Code | Merge `claudeMcp.json` into `~/.claude.json` or your project's `.mcp.json`. | Merge `claudeHooks.json` into `~/.claude/settings.json`. |
 | Cursor | Merge `cursorMcp.json` into `~/.cursor/mcp.json`. | Merge `cursorHooks.json` into `~/.cursor/hooks.json`. |
 | Codex | Merge both sections from `codexMcp.toml` into `~/.codex/config.toml`. | Merge `codexHooks.json` into `~/.codex/hooks.json`. In Codex, review and approve the four CrewPip hooks. You can also open the review with `/hooks`. |
+| Antigravity | Merge `antigravityMcp.json` into `mcpServers` in `~/.gemini/config/mcp_config.json`. | Add the `crewpip` entry from `antigravityHooks.json` to `~/.gemini/config/hooks.json`. Applies to the app, IDE, and CLI. Antigravity has no UserPromptSubmit and no SessionEnd: messages arrive at session start, before a model call (`PreInvocation`, each message once), and at the end of a turn (`Stop` with `continue`). |
 
 Start a new chat in the app you connected and ask it to “List my CrewPip chats using the `list_sessions` MCP tool.” An asterisk marks the current chat. If the list is empty or the asterisk is missing, check the hook settings and, for Codex, the hook approval. If the MCP connection returns HTTP 401, check that the generated `x-crewpip-token` header was included.
 

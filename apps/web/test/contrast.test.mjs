@@ -27,7 +27,7 @@ const TEXT_PAIRS = [
   ["danger", "bg"], ["danger", "panel"], ["attention-fg", "panel"], ["attention-fg", "bg"],
   ["warn-fg", "warn-bg"], ["error-fg", "error-bg"], ["ok-fg", "ok-bg"],
   ["connected", "panel"], ["attention-fg", "accent-bg"], ["warn-fg", "panel"], ["on-accent", "accent"], ["connected", "bg"], ["no-hook", "panel"], ["no-hook", "bg"],
-  ["claude-fg", "claude-bg"], ["codex-fg", "codex-bg"], ["cursor-fg", "cursor-bg"], ["human-fg", "human-bg"],
+  ["claude-fg", "claude-bg"], ["codex-fg", "codex-bg"], ["cursor-fg", "cursor-bg"], ["antigravity-fg", "antigravity-bg"], ["human-fg", "human-bg"],
 ];
 const UI_PAIRS = [["border-strong", "panel"], ["border-strong", "bg"], ["focus", "bg"], ["focus", "panel"], ["frame", "panel"], ["frame", "bg"], ["attention-line", "panel"], ["attention-line", "bg"]];
 
