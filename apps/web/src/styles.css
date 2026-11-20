@@ -610,7 +610,8 @@ button.dot { cursor: help; }
 .dot-stale svg * { fill: none; stroke-dasharray: 2.2 1.8; }
 .dot-role { font-size: 11px; font-weight: 700; color: var(--text); letter-spacing: 0; }
 .dot-none { color: var(--muted); }
-.dot-tip { display: none; flex-direction: column; gap: 1px; left: -4px; top: calc(100% + 4px); min-width: 200px; }
+.dot-tip { display: none; flex-direction: column; gap: 1px; left: -4px; top: calc(100% + 4px); min-width: 180px; max-width: min(240px, 60vw); }
+@media (max-width: 700px) { .dot-wrap .dot-tip { left: 0; transform: translateX(-30%); } .dot-wrap.tip-end .dot-tip { transform: none; } }
 .dot-wrap:hover .dot-tip, .dot:focus + .dot-tip { display: flex; }
 .dot-wrap.tip-hidden .dot-tip { display: none; }
 .dot-wrap.tip-end .dot-tip { left: auto; right: -4px; }

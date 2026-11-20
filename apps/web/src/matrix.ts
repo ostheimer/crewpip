@@ -12,7 +12,7 @@ export interface MatrixRow {
   cells: Partial<Record<AppKind, Session[]>>;
   sessions: Session[];
   pm: Session | undefined;
-  /** Beendete Chats zählen nicht. Der Director gilt für alle Repos, hier der beste Treffer. */
+  /** Beendete Chats zählen nicht. Director dieser Zeile, sonst der globale. */
   director: Session | undefined;
   connected: number;
   /** PM oder Director dieser Zeile sind „Ohne Hook“: Post erreicht sie nicht von selbst. */
@@ -47,11 +47,13 @@ export function buildMatrix(sessions: Session[], projects: Project[], projectId:
     const cells: MatrixRow["cells"] = {};
     for (const s of sorted) (cells[s.app] ??= []).push(s);
     const pm = sorted.find(s => s.role === "pm");
-    const holders = [pm, sorted.find(s => s.role === "director") ?? (director?.projectId === id ? director : undefined)];
+    // Der Director gilt für alle Repos. Gezeigt wird der Director dieser Zeile, sonst der globale;
+    // hervorgehoben wird nur, wenn PM oder der Director dieser Zeile ohne Hook sind.
+    const localDirector = sorted.find(s => s.role === "director");
     return {
-      id, name: g.name, cells, sessions: sorted, pm, director,
+      id, name: g.name, cells, sessions: sorted, pm, director: localDirector ?? director,
       connected: sorted.filter(s => s.connection === "connected").length,
-      alert: holders.some(h => h?.connection === "no-hook"),
+      alert: [pm, localDirector].some(h => h?.connection === "no-hook"),
     };
   }).sort((a, b) => a.name.localeCompare(b.name));
   const present = new Set(rows.flatMap(r => r.sessions.map(s => s.app)));

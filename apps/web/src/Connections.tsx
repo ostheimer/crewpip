@@ -5,7 +5,6 @@ import { useBoardLanguage } from "./language.tsx";
 import { AppMark, APP_SHAPES } from "./AppMark.tsx";
 import { buildMatrix, type MatrixRow } from "./matrix.ts";
 
-const STATE_ORDER = { connected: 0, "no-hook": 1, stale: 2, ended: 3 } as const;
 
 const time = (iso: string, locale: string) => {
   const d = new Date(iso);
@@ -160,7 +159,7 @@ function MatrixRowView({ row, apps, flows, liveIds }: { row: MatrixRow; apps: Ap
   const total = row.sessions.length;
   return <tbody className={`matrix-repo ${row.alert ? "matrix-alert" : ""} ${row.connected ? "" : "matrix-none"}`} data-repo={row.name}>
     <tr>
-      <th scope="row"><button type="button" className="repo-toggle" aria-expanded={open} aria-controls={detailId} onClick={() => setOpen(o => !o)}>
+      <th scope="row"><button type="button" className="repo-toggle" aria-expanded={open} aria-controls={open ? detailId : undefined} onClick={() => setOpen(o => !o)}>
         {open ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
         <span className="repo-name">{row.name}</span>
         <span className="repo-count" aria-label={ui.connectedCount(row.connected, total)}>{row.connected}/{total}</span>
@@ -168,7 +167,7 @@ function MatrixRowView({ row, apps, flows, liveIds }: { row: MatrixRow; apps: Ap
       </button></th>
       {apps.map((app, i) => {
         const chats = row.cells[app] ?? [];
-        return <td key={app}>{chats.length ? <span className="dot-list">{chats.map(s => <ChatDot key={s.id} session={s} edge={i >= apps.length - 1 && apps.length > 1} />)}</span> : <span className="dot-none" aria-label={ui.noAppChat(APP_LABELS[app])}>·</span>}</td>;
+        return <td key={app}>{chats.length ? <span className="dot-list">{chats.map(s => <ChatDot key={s.id} session={s} edge={i >= apps.length - 1 && apps.length > 1} />)}</span> : <span className="dot-none"><span aria-hidden="true">·</span><span className="sr-only">{ui.noAppChat(APP_LABELS[app])}</span></span>}</td>;
       })}
     </tr>
     {open && <tr className="matrix-detail"><td id={detailId} colSpan={apps.length + 1}>
