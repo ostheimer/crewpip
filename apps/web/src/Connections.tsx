@@ -1,11 +1,10 @@
 import { useId, useState } from "react";
 import { APP_LABELS, ROLE_LABELS, type AppKind, type MessageFlow, type Project, type Session } from "@crewpip/shared";
-import { CircleHelp } from "lucide-react";
+import { ChevronDown, ChevronRight, CircleHelp, Info } from "lucide-react";
 import { useBoardLanguage } from "./language.tsx";
 import { AppMark, APP_SHAPES } from "./AppMark.tsx";
+import { buildMatrix, type MatrixRow } from "./matrix.ts";
 
-/** Diese Apps bekommen immer eine Spalte, damit sichtbar ist, wo kein Chat arbeitet. */
-const MAIN_APPS: AppKind[] = ["claude", "codex"];
 const STATE_ORDER = { connected: 0, "no-hook": 1, stale: 2, ended: 3 } as const;
 
 const time = (iso: string, locale: string) => {
@@ -99,63 +98,117 @@ function FlowEnd({ end, projectId, live }: { end: MessageFlow["from"] | MessageF
   return <span className="flow-end"><AppMark app={end.app} /> <strong>{end.projectId === projectId ? end.name : `${end.project} / ${end.name}`}</strong>{!live.has(end.id) && <em className="flow-ended"> ({ui.flowEnded})</em>}</span>;
 }
 
+const ROLE_ABBR: Partial<Record<NonNullable<Session["role"]>, string>> = { pm: "PM", director: "D" };
+
 /**
- * Pro Repo: welche Chats mit CrewPip verbunden sind, wer PM und Director ist, und welche Chats
- * in den letzten 24 Stunden tatsächlich Post über CrewPip ausgetauscht haben.
+ * Ein Symbol je Chat: Form = App, gefüllt = Post kommt an, hohl = Ohne Hook, gestrichelt und
+ * gedämpft = veraltet. Name, Rolle, Zustand, letzter Kontakt und Adresse erscheinen bei Hover und
+ * Tastaturfokus; Escape blendet sie aus (WCAG 1.4.13).
+ */
+function ChatDot({ session, edge }: { session: Session; edge: boolean }) {
+  const { ui, locale } = useBoardLanguage();
+  const id = `dot-tip-${useId().replace(/[^\w-]/g, "")}`;
+  const [hidden, setHidden] = useState(false);
+  const role = session.role && session.role !== "worker" ? ROLE_LABELS[session.role] : null;
+  const abbr = session.role ? ROLE_ABBR[session.role] : undefined;
+  const label = [session.name, APP_LABELS[session.app], role, ui.connectionState[session.connection]].filter(Boolean).join(", ");
+  return <span className={`dot-wrap ${edge ? "tip-end" : ""} ${hidden ? "tip-hidden" : ""}`} onMouseLeave={() => setHidden(false)}>
+    <button type="button" className={`dot dot-${session.connection}`} aria-label={label} aria-describedby={id} data-state={session.connection} data-chat={session.id}
+      onKeyDown={e => { if (e.key === "Escape") setHidden(true); }} onBlur={() => setHidden(false)}>
+      <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true" focusable="false">{APP_SHAPES[session.app](14)}</svg>
+      {abbr && <span className="dot-role" aria-hidden="true">{abbr}</span>}
+    </button>
+    <span role="tooltip" id={id} className="conn-tip dot-tip">
+      <strong>{session.name}</strong>
+      <span>{APP_LABELS[session.app]}{role ? ` · ${role}` : ""}</span>
+      <span>{ui.connectionState[session.connection]}</span>
+      <span>{ui.lastContact} {time(session.lastSeenAt, locale)}</span>
+      <code>session:{session.id}</code>
+    </span>
+  </span>;
+}
+
+/** Symbol der Legende: gleiche Zeichnung wie im Chat-Symbol, damit man sie wiedererkennt. */
+function LegendDot({ state }: { state: "connected" | "no-hook" | "stale" }) {
+  const { ui } = useBoardLanguage();
+  return <span className="legend-item"><span className={`dot dot-${state}`} aria-hidden="true"><svg viewBox="0 0 14 14" width="14" height="14" focusable="false">{APP_SHAPES.claude(14)}</svg></span>{ui.connectionState[state]}</span>;
+}
+
+/** Erklärtexte der Übersicht, nur auf Wunsch sichtbar (Knopf neben der Überschrift). */
+function InfoPanel() {
+  const { ui } = useBoardLanguage();
+  const id = `matrix-info-${useId().replace(/[^\w-]/g, "")}`;
+  const [open, setOpen] = useState(false);
+  return <>
+    <button type="button" className="info-button" aria-expanded={open} aria-controls={id} aria-label={ui.matrixInfoLabel} title={ui.matrixInfoLabel}
+      onClick={() => setOpen(o => !o)} onKeyDown={e => { if (e.key === "Escape") setOpen(false); }}><Info size={16} aria-hidden="true" /></button>
+    {open && <div id={id} className="info-panel" role="region" aria-label={ui.matrixInfoLabel} onKeyDown={e => { if (e.key === "Escape") setOpen(false); }}>
+      <p>{ui.connectionsIntro}</p>
+      <ul>{(["connected", "no-hook", "stale"] as const).map(k => <li key={k}><strong>{ui.connectionState[k]}:</strong> {ui.connectionHint[k]}</li>)}</ul>
+      <p>{ui.matrixSymbols}</p>
+    </div>}
+  </>;
+}
+
+function MatrixRowView({ row, apps, flows, liveIds }: { row: MatrixRow; apps: AppKind[]; flows: MessageFlow[]; liveIds: Set<string> }) {
+  const { ui, locale } = useBoardLanguage();
+  const [open, setOpen] = useState(false);
+  const [graph, setGraph] = useState(false);
+  const detailId = `repo-${useId().replace(/[^\w-]/g, "")}`;
+  const mine = flows.filter(f => f.to.projectId === row.id || (f.from.kind === "session" && f.from.projectId === row.id));
+  const graphSessions = [...row.sessions].sort((a, b) => a.app.localeCompare(b.app) || a.name.localeCompare(b.name));
+  const total = row.sessions.length;
+  return <tbody className={`matrix-repo ${row.alert ? "matrix-alert" : ""} ${row.connected ? "" : "matrix-none"}`} data-repo={row.name}>
+    <tr>
+      <th scope="row"><button type="button" className="repo-toggle" aria-expanded={open} aria-controls={detailId} onClick={() => setOpen(o => !o)}>
+        {open ? <ChevronDown size={14} aria-hidden="true" /> : <ChevronRight size={14} aria-hidden="true" />}
+        <span className="repo-name">{row.name}</span>
+        <span className="repo-count" aria-label={ui.connectedCount(row.connected, total)}>{row.connected}/{total}</span>
+        {row.alert && <span className="repo-alert"><span aria-hidden="true">▲</span><span className="sr-only">{ui.matrixAlert}</span></span>}
+      </button></th>
+      {apps.map((app, i) => {
+        const chats = row.cells[app] ?? [];
+        return <td key={app}>{chats.length ? <span className="dot-list">{chats.map(s => <ChatDot key={s.id} session={s} edge={i >= apps.length - 1 && apps.length > 1} />)}</span> : <span className="dot-none" aria-label={ui.noAppChat(APP_LABELS[app])}>·</span>}</td>;
+      })}
+    </tr>
+    {open && <tr className="matrix-detail"><td id={detailId} colSpan={apps.length + 1}>
+      <div className="conn-roles"><RoleHolder label="PM" holder={row.pm} /><RoleHolder label="Director" holder={row.director} /></div>
+      <ul className="conn-chat-list" aria-label={ui.chatList}>{row.sessions.map(s => <li key={s.id} className={`conn-chat conn-${s.connection}`}>
+        <div className="conn-chat-head"><AppMark app={s.app} /><strong title={s.cwd}>{s.name}</strong>{s.role && <span className={`badge role-${s.role}`}>{ROLE_LABELS[s.role]}</span>}</div>
+        <div className="conn-chat-meta"><StateBadge session={s} /><span>{ui.lastContact} {time(s.lastSeenAt, locale)}</span>{s.worktree && <span className="conn-worktree">{s.worktree}</span>}</div>
+      </li>)}</ul>
+      <div className="conn-flows"><h4>{ui.flowsTitle}</h4>
+        {mine.length
+          ? <ul aria-label={ui.flowsTitle}>{mine.map(f => <li key={`${f.from.kind === "session" ? f.from.id : f.from.name}>${f.to.id}`}>
+              <FlowEnd end={f.from} projectId={row.id} live={liveIds} /> <span aria-hidden="true">→</span><span className="sr-only">{ui.flowTo}</span> <FlowEnd end={f.to} projectId={row.id} live={liveIds} />
+              <span className="flow-meta"> · {ui.flowCount(f.count)} · {ui.flowLast} {time(f.lastAt, locale)}</span>
+            </li>)}</ul>
+          : <p className="conn-empty">{ui.noFlows}</p>}
+      </div>
+      <button type="button" className="text-button graph-toggle" aria-expanded={graph} onClick={() => setGraph(g => !g)}>{graph ? ui.hideGraph : ui.showGraph}</button>
+      {graph && <><StarGraph name={row.name} sessions={graphSessions} flows={mine} /><p className="graph-legend">{ui.graphLegend}</p></>}
+    </td></tr>}
+  </tbody>;
+}
+
+/**
+ * Matrix Repo × App (Issue #22): eine Zeile je Repo, eine Spalte je vorkommender App, ein Symbol je
+ * Chat. Details (Chatliste, Nachrichtenwege der letzten 24 Stunden, Stern-Grafik) klappen je Zeile
+ * auf, Erklärtexte stehen hinter dem Info-Knopf.
  */
 export function Connections({ sessions, projects, projectId, flows }: { sessions: Session[]; projects: Project[]; projectId: string | null; flows: MessageFlow[] }) {
-  const { ui, locale } = useBoardLanguage();
-  const live = sessions.filter(s => s.connection !== "ended");
-  const liveIds = new Set(live.map(s => s.id));
-  const director = live.filter(s => s.role === "director").sort((a, b) => STATE_ORDER[a.connection] - STATE_ORDER[b.connection])[0];
-  const groups = new Map<string, { name: string; sessions: Session[] }>();
-  for (const s of live) {
-    if (projectId && s.projectId !== projectId) continue;
-    const g = groups.get(s.projectId) ?? { name: s.project, sessions: [] };
-    g.sessions.push(s);
-    groups.set(s.projectId, g);
-  }
-  const ordered = [...groups.entries()].sort(([, a], [, b]) => a.name.localeCompare(b.name));
-  const withoutChat = projects.filter(p => !groups.has(p.id) && (!projectId || p.id === projectId));
-
+  const { ui } = useBoardLanguage();
+  const { apps, rows, withoutChat } = buildMatrix(sessions, projects, projectId);
+  const liveIds = new Set(sessions.filter(s => s.connection !== "ended").map(s => s.id));
   return <section className="connections" aria-labelledby="connections-title">
-    <div className="section-heading"><div><h2 id="connections-title">{ui.connectionsTitle}</h2><p>{ui.connectionsIntro}</p></div></div>
-    <div className="conn-grid">
-      {ordered.map(([id, g]) => {
-        const connected = g.sessions.filter(s => s.connection === "connected").length;
-        const pm = g.sessions.filter(s => s.role === "pm").sort((a, b) => STATE_ORDER[a.connection] - STATE_ORDER[b.connection] || b.lastSeenAt.localeCompare(a.lastSeenAt))[0];
-        const apps = [...MAIN_APPS, ...new Set(g.sessions.map(s => s.app).filter(a => !MAIN_APPS.includes(a)))];
-        const graphSessions = [...g.sessions].sort((a, b) => a.app.localeCompare(b.app) || a.name.localeCompare(b.name));
-        const mine = flows.filter(f => f.to.projectId === id || (f.from.kind === "session" && f.from.projectId === id));
-        return <section key={id} role="group" aria-label={g.name} className={`conn-project ${connected ? "" : "conn-none"}`}>
-          <header><h3>{g.name}</h3><span className="conn-count">{connected ? ui.connectedCount(connected, g.sessions.length) : ui.noConnectedChat}</span></header>
-          <div className="conn-roles"><RoleHolder label="PM" holder={pm} /><RoleHolder label="Director" holder={director} /></div>
-          <StarGraph name={g.name} sessions={graphSessions} flows={mine} />
-          <p className="graph-legend">{ui.graphLegend}</p>
-          <div className="conn-flows"><h4>{ui.flowsTitle}</h4>
-            {mine.length
-              ? <ul aria-label={ui.flowsTitle}>{mine.map(f => <li key={`${f.from.kind === "session" ? f.from.id : f.from.name}>${f.to.id}`}>
-                  <FlowEnd end={f.from} projectId={id} live={liveIds} /> <span aria-hidden="true">→</span><span className="sr-only">{ui.flowTo}</span> <FlowEnd end={f.to} projectId={id} live={liveIds} />
-                  <span className="flow-meta"> · {ui.flowCount(f.count)} · {ui.flowLast} {time(f.lastAt, locale)}</span>
-                </li>)}</ul>
-              : <p className="conn-empty">{ui.noFlows}</p>}
-          </div>
-          <div className="conn-apps">{apps.map(app => {
-            const chats = g.sessions.filter(s => s.app === app).sort((a, b) => STATE_ORDER[a.connection] - STATE_ORDER[b.connection] || b.lastSeenAt.localeCompare(a.lastSeenAt));
-            return <div key={app} className={`conn-app app-col-${app}`}>
-              <h4><AppMark app={app} /></h4>
-              {chats.length
-                ? <ul aria-label={APP_LABELS[app]}>{chats.map(s => <li key={s.id} className={`conn-chat conn-${s.connection}`}>
-                    <div className="conn-chat-head"><AppMark app={s.app} /><strong title={s.cwd}>{s.name}</strong>{s.role && <span className={`badge role-${s.role}`}>{ROLE_LABELS[s.role]}</span>}</div>
-                    <div className="conn-chat-meta"><StateBadge session={s} /><span>{ui.lastContact} {time(s.lastSeenAt, locale)}</span>{s.worktree && <span className="conn-worktree">{s.worktree}</span>}</div>
-                  </li>)}</ul>
-                : <p className="conn-empty">{ui.noAppChat(APP_LABELS[app])}</p>}
-            </div>;
-          })}</div>
-        </section>;
-      })}
-      {!ordered.length && <p className="hint">{ui.noConnectedChat}</p>}
-    </div>
+    <div className="section-heading matrix-heading"><h2 id="connections-title">{ui.connectionsTitle}</h2><InfoPanel /></div>
+    <p className="matrix-legend"><LegendDot state="connected" /><LegendDot state="no-hook" /><LegendDot state="stale" /><span className="legend-item"><span className="dot-none" aria-hidden="true">·</span>{ui.legendNoChat}</span><span className="legend-item legend-role">{ui.legendRole}</span></p>
+    {rows.length > 0 && <table className="conn-matrix">
+      <caption className="sr-only">{ui.connectionsTitle}</caption>
+      <thead><tr><th scope="col">{ui.matrixRepo}</th>{apps.map(a => <th scope="col" key={a}><AppMark app={a} /></th>)}</tr></thead>
+      {rows.map(r => <MatrixRowView key={r.id} row={r} apps={apps} flows={flows} liveIds={liveIds} />)}
+    </table>}
+    {!rows.length && <p className="hint">{ui.noConnectedChat}</p>}
     {withoutChat.length > 0 && <p className="conn-without"><span>{ui.projectsWithoutChat}</span> {withoutChat.map(p => p.name).join(", ")}</p>}
   </section>;
 }

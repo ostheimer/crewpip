@@ -573,3 +573,52 @@ input, select, textarea { border-radius: 2px; border: 1px solid var(--border-str
 .flow-end strong { font-weight: 600; }
 .flow-meta { color: var(--muted); font-size: 13px; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Issue #22: Matrix Repo × App. Zeilen bleiben niedrig, damit viele Repos ohne Scrollen sichtbar sind. */
+.connections { margin: 18px 0; }
+.matrix-heading { margin-bottom: 6px; justify-content: flex-start; position: relative; flex-wrap: wrap; }
+.info-button { display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; background: transparent; color: var(--accent); border: 1px solid var(--frame); border-radius: 2px; cursor: help; }
+.info-button[aria-expanded="true"] { background: var(--accent-bg); }
+.info-button:focus-visible, .repo-toggle:focus-visible, .dot:focus-visible, .graph-toggle:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.info-panel { flex-basis: 100%; background: var(--panel); border: 1px solid var(--frame); border-radius: 4px; padding: 8px 14px; font-size: 14px; line-height: 1.5; box-shadow: var(--glow); }
+.info-panel p { margin: 6px 0; color: var(--text); }
+.info-panel ul { margin: 6px 0; padding-left: 18px; }
+.matrix-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 16px; margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.legend-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.conn-matrix { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--frame); font-size: 14px; }
+.conn-matrix thead th { text-align: left; padding: 5px 10px; font-size: 13px; color: var(--muted); border-bottom: 2px solid var(--frame); font-weight: 700; }
+.conn-matrix tbody { border-top: 1px solid var(--border); }
+.conn-matrix tbody:first-of-type { border-top: 0; }
+.conn-matrix td, .conn-matrix tbody > tr:first-child > th { padding: 2px 10px; vertical-align: middle; text-align: left; font-weight: 400; }
+.matrix-repo > tr:first-child { height: 30px; }
+.repo-toggle { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 2px 4px; background: transparent; border: 0; color: var(--text); font: inherit; cursor: pointer; text-align: left; }
+.repo-toggle:hover .repo-name { text-decoration: underline; }
+.repo-name { font-weight: 700; overflow-wrap: anywhere; }
+.repo-count { font-size: 13px; color: var(--muted); }
+.matrix-none .repo-count { color: var(--danger); font-weight: 700; }
+.repo-alert { color: var(--attention-fg); font-size: 13px; }
+.matrix-alert { background: var(--warn-bg); box-shadow: inset 4px 0 0 var(--attention-line); }
+.dot-list { display: inline-flex; flex-wrap: wrap; gap: 2px 6px; align-items: center; }
+.dot-wrap { position: relative; display: inline-flex; }
+.dot { display: inline-flex; align-items: center; gap: 2px; padding: 3px; background: transparent; border: 0; border-radius: 2px; color: var(--connected); font: inherit; }
+button.dot { cursor: help; }
+.dot svg { overflow: visible; }
+.dot svg * { stroke: currentColor; stroke-width: 1.6; fill: currentColor; }
+.dot-no-hook { color: var(--no-hook); }
+.dot-no-hook svg * { fill: none; }
+.dot-stale { color: var(--muted); opacity: .8; }
+.dot-stale svg * { fill: none; stroke-dasharray: 2.2 1.8; }
+.dot-role { font-size: 11px; font-weight: 700; color: var(--text); letter-spacing: 0; }
+.dot-none { color: var(--muted); }
+.dot-tip { display: none; flex-direction: column; gap: 1px; left: -4px; top: calc(100% + 4px); min-width: 200px; }
+.dot-wrap:hover .dot-tip, .dot:focus + .dot-tip { display: flex; }
+.dot-wrap.tip-hidden .dot-tip { display: none; }
+.dot-wrap.tip-end .dot-tip { left: auto; right: -4px; }
+.dot-tip code { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.matrix-detail > td { padding: 8px 12px 12px 28px; background: var(--bg); border-top: 1px dashed var(--border); }
+.matrix-detail .conn-roles { margin: 0 0 8px; }
+.conn-chat-list { list-style: none; margin: 0 0 10px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+.matrix-detail .conn-flows h4 { margin: 6px 0 4px; font-size: 13px; }
+.matrix-detail .conn-flows ul { margin: 0; padding-left: 18px; font-size: 13px; }
+.graph-toggle { margin-top: 8px; }
+@media (max-width: 700px) { .conn-matrix td, .conn-matrix tbody > tr:first-child > th, .conn-matrix thead th { padding-left: 4px; padding-right: 4px; } .matrix-detail > td { padding-left: 8px; } }
