@@ -14,8 +14,12 @@ import {
   type Session,
   type SessionStatus,
   type SessionRole,
+  type ExclusiveRole,
+  type RoleChange,
+  type RoleConflict,
   type Target,
   APP_LABELS,
+  ROLE_ADMIN_PROJECT,
   roleFromName,
   formatTarget,
   parseTarget,
@@ -40,6 +44,8 @@ interface SessionRow {
   name: string;
   name_source: NameSource;
   role: SessionRole | null;
+  /** Wirksamer Anzeigename, aus dem zuletzt eine Rolle abgeleitet wurde (#28) */
+  role_claim: string | null;
   spawned_by_run: number | null;
   project_id: string | null;
   pid: number | null;
@@ -263,6 +269,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
       lastSeenAt: r.last_seen_at,
       endedAt: r.ended_at,
       role: r.role,
+      roleConflict: r.ended_at ? null : this.roleConflictOf(r),
       spawnedByRun: r.spawned_by_run,
       pending: r.ended_at ? 0 : this.pendingFor(r.id).length,
       task: r.ended_at ? null : (() => {
@@ -315,7 +322,6 @@ export class Inbox extends EventEmitter<InboxEvents> {
     const worktree = path.resolve(s.cwd) === proj.root ? null : path.basename(path.resolve(s.cwd));
     const name = s.name?.trim() || null;
     const source: NameSource = name ? (s.nameSource ?? "override") : "auto";
-    const role = s.role !== undefined ? s.role : name ? roleFromName(name) : null;
     if (!existing) {
       const started = s.startedAt ?? now;
       this.db
@@ -340,15 +346,17 @@ export class Inbox extends EventEmitter<InboxEvents> {
         )
         .run(s.app, project, worktree, proj.id, s.cwd, keepName ? null : name, keepName ? null : source, s.runId ?? null, s.pid ?? null, s.status ?? null, s.touch === false ? existing.last_seen_at : now, s.id);
     }
-    // Die Rolle läuft über setRole, damit die Ablösung des bisherigen Directors oder PM
-    // auch dann greift, wenn die Rolle nur aus dem Namen abgeleitet wurde.
-    if (s.role !== undefined) this.setRole(s.id, s.role);
-    else if (role && nameApplied && (!existing || s.touch !== false)) this.setRole(s.id, role);
-    else if (existing?.ended_at && (existing.role === "director" || existing.role === "pm")) {
-      const occupied = this.db.prepare(
-        "SELECT 1 FROM sessions WHERE id <> ? AND ended_at IS NULL AND role = ? AND (role = 'director' OR project_id = ?)",
-      ).get(s.id, existing.role, proj.id);
-      if (occupied) this.setRole(s.id, null);
+    // Eine ausdrücklich mitgegebene Rolle hängt um. Sonst zählt der wirksame Anzeigename,
+    // gleich aus welcher Quelle (Hook, Claude-Registry, native App-Titel): claimFromName.
+    if (s.role !== undefined) this.setRole(s.id, s.role, "system");
+    else {
+      if (existing?.ended_at && (existing.role === "director" || existing.role === "pm")) {
+        const occupied = this.db.prepare(
+          "SELECT 1 FROM sessions WHERE id <> ? AND ended_at IS NULL AND role = ? AND (role = 'director' OR project_id = ?)",
+        ).get(s.id, existing.role, proj.id);
+        if (occupied) this.setRole(s.id, null, "system");
+      }
+      this.claimFromName(s.id);
     }
     if (!existing || existing.project_id !== proj.id || (nameApplied && (existing.name !== name || existing.name_source !== source))) this.board.emit("projects");
 
@@ -404,7 +412,12 @@ export class Inbox extends EventEmitter<InboxEvents> {
   endSession(id: string): void {
     this.activity.delete(id);
     this.hookAt.delete(id);
+    const before = this.sessionRow(id);
     this.db.prepare("UPDATE sessions SET ended_at = ?, status = 'ended' WHERE id = ? AND ended_at IS NULL").run(new Date().toISOString(), id);
+    // Wird eine Rolle frei, bekommt sie ein Chat, der sie als einziger per Namen beansprucht.
+    if (before && !before.ended_at && (before.role === "pm" || before.role === "director")) {
+      for (const r of this.liveInScope(before.role, before.project_id)) this.claimFromName(r.id, true);
+    }
     this.emit("sessions");
   }
 
@@ -412,8 +425,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
     const clean = name.trim();
     if (!clean) throw new Error("Leerer Name");
     this.db.prepare("UPDATE sessions SET name = ?, name_source = 'override' WHERE id = ?").run(clean, id);
-    const derived = roleFromName(clean);
-    if (derived) this.setRole(id, derived);
+    this.claimFromName(id);
     const row = this.sessionRow(id);
     if (!row) throw new Error("Unbekannte Session");
     this.board.emit("projects");
@@ -422,20 +434,113 @@ export class Inbox extends EventEmitter<InboxEvents> {
   }
 
   /**
-   * Rolle setzen. Es soll je Projekt nur einen PM und insgesamt nur einen Director geben;
-   * eine neue Vergabe nimmt der bisherigen aktiven Session die Rolle ab, statt zu scheitern.
+   * Rolle ausdrücklich setzen (Dashboard, set_role, mitgegebene Rolle). Es gibt je Projekt nur
+   * einen PM und insgesamt nur einen Director; die Vergabe nimmt der bisherigen aktiven Session
+   * die Rolle ab. Jede Änderung wird mit Akteur protokolliert (role_changes).
    */
-  setRole(id: string, role: SessionRole | null): Session {
+  setRole(id: string, role: SessionRole | null, actor = "system"): Session {
     const row = this.sessionRow(id);
     if (!row) throw new Error(`Unbekannte Session: ${id}`);
-    if (role === "director") {
-      this.db.prepare("UPDATE sessions SET role = NULL WHERE role = 'director' AND id <> ? AND ended_at IS NULL").run(id);
-    } else if (role === "pm") {
-      this.db.prepare("UPDATE sessions SET role = NULL WHERE role = 'pm' AND project_id = ? AND id <> ? AND ended_at IS NULL").run(row.project_id, id);
-    }
+    if (row.role === role) return this.toSession(row);
+    if (row.ended_at && (role === "pm" || role === "director")) throw new Error(`Session ist beendet: ${row.name}`);
+    const log = this.db.prepare("INSERT INTO role_changes(role, project_id, from_session, to_session, actor) VALUES (?, ?, ?, ?, ?)");
+    const scope = (r: SessionRole) => (r === "director" ? null : row.project_id);
+    if (role === "director" || role === "pm") {
+      const prev = this.liveInScope(role, row.project_id).find((r) => r.role === role && r.id !== id);
+      if (prev) this.db.prepare("UPDATE sessions SET role = NULL WHERE id = ?").run(prev.id);
+      log.run(role, scope(role), prev?.id ?? null, id, actor);
+    } else if (role) log.run(role, scope(role), null, id, actor);
+    // Die bisherige Rolle dieser Session wird abgegeben.
+    if (row.role) log.run(row.role, scope(row.role), id, null, actor);
     this.db.prepare("UPDATE sessions SET role = ? WHERE id = ?").run(role, id);
     this.emit("sessions");
     return this.toSession(this.sessionRow(id)!);
+  }
+
+  /** Eine Session nach ID, auch beendete; null wenn unbekannt. */
+  session(id: string): Session | null {
+    const row = this.sessionRow(id);
+    return row ? this.toSession(row) : null;
+  }
+
+  /** Protokoll der Rollenwechsel, neueste zuerst. */
+  roleChanges(limit = 100): RoleChange[] {
+    const rows = this.db.prepare("SELECT * FROM role_changes ORDER BY id DESC LIMIT ?").all(limit) as unknown as {
+      id: number; role: SessionRole; project_id: string | null; from_session: string | null; to_session: string | null; actor: string; created_at: string;
+    }[];
+    return rows.map((r) => ({ id: r.id, role: r.role, projectId: r.project_id, fromSession: r.from_session, toSession: r.to_session, actor: r.actor, at: r.created_at }));
+  }
+
+  /** Wirksamer Anzeigename: der native Titel der App, sonst der gespeicherte Name (#24). */
+  private effectiveName(r: SessionRow): string {
+    return this.board.sessionDisplay(r).name;
+  }
+
+  /** Lebende Sessions, unter denen es die Rolle nur einmal gibt: alle (Director) oder das Projekt (PM). */
+  private liveInScope(role: ExclusiveRole, projectId: string | null): SessionRow[] {
+    return (role === "director"
+      ? this.db.prepare("SELECT * FROM sessions WHERE ended_at IS NULL").all()
+      : this.db.prepare("SELECT * FROM sessions WHERE ended_at IS NULL AND project_id IS ?").all(projectId)) as unknown as SessionRow[];
+  }
+
+  /**
+   * Rolle aus dem wirksamen Anzeigenamen ableiten (#28). Ausgewertet wird nur, wenn sich dieser
+   * Name seit der letzten Auswertung geändert hat (oder force), damit eine im Dashboard
+   * abgegebene Rolle nicht beim nächsten Abgleich zurückkommt.
+   *
+   * PM und Director werden nie still umgehängt: Hält ein anderer lebender Chat die Rolle, oder
+   * beansprucht ein weiterer sie ebenfalls per Namen, bleibt alles, wie es ist. Den Konflikt
+   * zeigen Dashboard und list_sessions (roleConflictOf); gelöst wird er mit setRole.
+   */
+  private claimFromName(id: string, force = false): void {
+    const row = this.sessionRow(id);
+    if (!row || row.ended_at) return;
+    const name = this.effectiveName(row);
+    if (!force && row.role_claim === name) return;
+    this.db.prepare("UPDATE sessions SET role_claim = ? WHERE id = ?").run(name, id);
+    const claimed = roleFromName(name);
+    if (!claimed || claimed === row.role) return;
+    // PM und Director gibt ein Chat nur ausdrücklich ab, nicht durch Umbenennen.
+    if (row.role === "pm" || row.role === "director") return;
+    if (claimed === "worker") {
+      // Worker ist nicht exklusiv.
+      if (!row.role) this.setRole(id, "worker", "name");
+      return;
+    }
+    const others = this.liveInScope(claimed, row.project_id).filter((r) => r.id !== id);
+    if (others.some((r) => r.role === claimed)) return;
+    if (others.some((r) => roleFromName(this.effectiveName(r)) === claimed)) return;
+    this.setRole(id, claimed, "name");
+  }
+
+  /** Alle lebenden Sessions nach einem Abgleich der nativen Namen neu auswerten. */
+  syncNameRoles(): void {
+    const ids = this.db.prepare("SELECT id FROM sessions WHERE ended_at IS NULL ORDER BY started_at").all() as unknown as { id: string }[];
+    for (const { id } of ids) this.claimFromName(id);
+  }
+
+  /** Beansprucht diese Session per Namen eine Rolle, die sie nicht hat? Siehe RoleConflict. */
+  private roleConflictOf(r: SessionRow): RoleConflict | null {
+    const claimed = roleFromName(this.effectiveName(r));
+    if ((claimed !== "pm" && claimed !== "director") || r.role === claimed) return null;
+    const others = this.liveInScope(claimed, r.project_id).filter((o) => o.id !== r.id);
+    const holder = others.find((o) => o.role === claimed);
+    if (holder) return { role: claimed, holderId: holder.id, holderLabel: this.board.sessionDisplay(holder).label };
+    if (others.some((o) => roleFromName(this.effectiveName(o)) === claimed)) return { role: claimed, holderId: null, holderLabel: null };
+    return null;
+  }
+
+  /**
+   * Darf actor der Session target die Rolle role geben oder nehmen? Erlaubt sind der Director,
+   * der PM von ROLE_ADMIN_PROJECT und – innerhalb des eigenen Projekts, nicht für den Director –
+   * der aktuelle PM dieses Projekts (#28).
+   */
+  mayAssignRole(actor: Session, target: Session, role: SessionRole | null): boolean {
+    if (actor.status === "ended") return false;
+    if (actor.role === "director") return true;
+    if (actor.role === "pm" && actor.projectId === ROLE_ADMIN_PROJECT) return true;
+    if (role === "director" || target.role === "director") return false;
+    return actor.role === "pm" && actor.projectId === target.projectId;
   }
 
   /** Session, die aus einem Lauf hervorgegangen ist. */

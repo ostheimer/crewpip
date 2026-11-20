@@ -232,6 +232,14 @@ export const de = {
       ["all", "alle Chats, die beim Absenden schon liefen."],
       ["human:<name>", "ein Mensch. Die Nachricht bleibt im Board."],
     ],
+    rolesTitle: "Rollen und Rollenwechsel",
+    rolesIntro: "`pm:<projekt>` und `director` erreichen genau einen Chat: je Projekt einen PM, insgesamt einen Director. Die Rolle kommt aus dem Chatnamen („PM …“, „Director“, „Worker …“), gleich ob der Name per `/rename`, in der App (Codex, Claude Desktop) oder vom Hook stammt.",
+    roles: [
+      ["Konflikt", "Heißt ein zweiter Chat wie der PM oder Director, hängt CrewPip nicht still um: Der bisherige Inhaber behält die Rolle, die Übersicht zeigt „Rollenkonflikt“ in der Projektzeile, `list_sessions` nennt ihn. Beanspruchen zwei Chats eine freie Rolle gleichzeitig, bekommt sie keiner, bis jemand entscheidet."],
+      ["Wechsel im Board", "Projekt wählen, „Chats und Rollen verwalten“ öffnen, beim neuen Chat die Rolle wählen. Der bisherige Inhaber verliert sie."],
+      ["Wechsel per Chat", "MCP-Werkzeug `set_role` mit `session:<id>` und `pm`, `director`, `worker` oder `none`. Erlaubt nur dem aktuellen PM des Projekts (nicht für den Director), dem Director und dem PM crewpip; nur mit Entscheidung des Menschen."],
+      ["Protokoll und wartende Post", "Jeder Wechsel wird mit Akteur, Zeit, altem und neuem Inhaber protokolliert (`/api/role-changes`). Post, die an `pm:<projekt>` wartet, bekommt der neue Inhaber beim nächsten Turn."],
+    ],
     statesTitle: "Zustände",
     statesIntro: "Der Zustand an jedem Chat beschreibt seine Verbindung zu CrewPip, nicht zu anderen Chats. Die Regel steht in `docs/verbindung.md`.",
     /** Die Namen der Zustände kommen aus connectionState, damit Seite und Übersicht gleich heißen. */
@@ -269,7 +277,12 @@ export const de = {
   pendingChats: (n: number) => n === 1 ? "1 Chat wartet auf Zustellung" : `${n} Chats warten auf Zustellung`,
   allProjectCount: (n: number) => `Alle ${n} Projekte anzeigen`,
   registered: (n: number) => n === 1 ? "1 Chat angemeldet" : `${n} Chats angemeldet`,
-  manageChats: (name: string, n: number) => `Angemeldete Chats in ${name} verwalten (${n})`,
+  manageChats: (name: string, n: number) => `Chats und Rollen in ${name} verwalten (${n})`,
+  roleConflictBadge: "Rollenkonflikt",
+  roleConflictText: (name: string, app: string, role: string, holder: string | null) => holder
+    ? `${name} (${app}) heißt wie ein ${role}, die Rolle hat aber ${holder}.`
+    : `${name} (${app}) beansprucht ${role} per Namen, ein weiterer Chat ebenfalls; deshalb ist die Rolle nicht vergeben.`,
+  roleConflictHowTo: "CrewPip hängt Rollen nie still um. Wechsel unter „Chats und Rollen verwalten“ oder per set_role (aktueller PM, Director oder PM crewpip); umbenennen löst den Konflikt ebenfalls.",
   roleFor: (name: string) => `Rolle für ${name}`,
   forgetChat: (name: string) => `${name} aus dem Board austragen? Der Chat selbst bleibt erhalten.`,
   taskCreated: (name: string) => `Aufgabe in ${name} angelegt. Es wurde kein Agent gestartet.`,

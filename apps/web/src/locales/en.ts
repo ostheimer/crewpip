@@ -204,7 +204,12 @@ export const en = {
   pendingChats: (n: number) => n === 1 ? "1 chat awaiting delivery" : `${n} chats awaiting delivery`,
   allProjectCount: (n: number) => `Show all projects (${n})`,
   registered: (n: number) => n === 1 ? "1 chat registered" : `${n} chats registered`,
-  manageChats: (name: string, n: number) => `Manage registered chats in ${name} (${n})`,
+  manageChats: (name: string, n: number) => `Manage chats and roles in ${name} (${n})`,
+  roleConflictBadge: "Role conflict",
+  roleConflictText: (name: string, app: string, role: string, holder: string | null) => holder
+    ? `${name} (${app}) is named like a ${role}, but ${holder} holds the role.`
+    : `${name} (${app}) claims ${role} by name, and so does another chat; the role is therefore not assigned.`,
+  roleConflictHowTo: "CrewPip never reassigns roles silently. Change it under “Manage chats and roles” or with set_role (current PM, director, or PM crewpip); renaming also resolves the conflict.",
   roleFor: (name: string) => `Role for ${name}`,
   forgetChat: (name: string) => `Unregister ${name} from the board? The chat itself will be kept.`,
   taskCreated: (name: string) => `Task created in ${name}. No agent was started.`,
@@ -264,6 +269,14 @@ export const en = {
       ["app:<claude|codex|cursor|antigravity>", "all chats of one app that were already running when the message was sent."],
       ["all", "all chats that were already running when the message was sent."],
       ["human:<name>", "a person. The message stays on the board."],
+    ],
+    rolesTitle: "Roles and role changes",
+    rolesIntro: "`pm:<project>` and `director` reach exactly one chat: one PM per project, one director overall. The role comes from the chat name (“PM …”, “Director”, “Worker …”), whether the name was set with `/rename`, in the app (Codex, Claude Desktop) or by the hook.",
+    roles: [
+      ["Conflict", "If a second chat is named like the PM or director, CrewPip does not reassign silently: the current holder keeps the role, the overview shows “Role conflict” in the project row, and `list_sessions` names it. If two chats claim a free role at once, neither gets it until someone decides."],
+      ["Change on the board", "Select the project, open “Manage chats and roles”, pick the role for the new chat. The previous holder loses it."],
+      ["Change from a chat", "MCP tool `set_role` with `session:<id>` and `pm`, `director`, `worker` or `none`. Allowed only for the project's current PM (not for director), the director and the PM crewpip; only with the human's decision."],
+      ["Log and waiting messages", "Every change is logged with actor, time, previous and new holder (`/api/role-changes`). Messages waiting for `pm:<project>` reach the new holder on its next turn."],
     ],
     statesTitle: "States",
     statesIntro: "The state on each chat describes its connection to CrewPip, not to other chats. The rule is documented in `docs/verbindung.md`.",

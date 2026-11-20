@@ -308,7 +308,8 @@ Alle Tools brauchen `cwd`, das absolute Arbeitsverzeichnis der aufrufenden Sessi
 | `post_message(cwd, to, text)` | Nachricht an `session:<id>`, `project:<name>`, `app:<app>`, `all` oder `human:<name>` |
 | `read_inbox(cwd)` | Ausstehende Nachrichten holen, gilt danach als zugestellt |
 | `wait_for_message(cwd, timeout_seconds?)` | Bis zu 50 s auf eine neue Nachricht warten |
-| `list_sessions(cwd)` | Aktive Sessions nach Projekt mit ihren Zieladressen |
+| `list_sessions(cwd)` | Aktive Sessions nach Projekt mit ihren Zieladressen und Rollenkonflikten |
+| `set_role(cwd, session, role)` | Rolle `pm`, `director`, `worker` oder `none` umhängen; nur aktueller PM, Director, PM crewpip ([Rollen](docs/rollen.md)) |
 | `list_tasks(cwd, status?, all_projects?)` | Aufgaben des Projekts |
 | `create_task(cwd, title, body?)` | Aufgabe anlegen |
 | `claim_task(cwd, id)` | Aufgabe übernehmen, scheitert bei fremder Zuweisung |
@@ -330,7 +331,8 @@ Jede zugestellte Nachricht nennt ihre Antwortadresse (`antworten an: session:…
 | `GET /api/projects/:id/worktrees` | alle git-Worktrees, auch fremde |
 | `GET/POST /api/tasks`, `PATCH /api/tasks/:id` | Aufgaben lesen, anlegen, ändern |
 | `POST/DELETE /api/tasks/:id/worktree` | Worktree anlegen und entfernen (`?force=1`) |
-| `PATCH /api/sessions/:id` `{name}` | Session umbenennen |
+| `PATCH /api/sessions/:id` `{name}` oder `{role}` | Session umbenennen, Rolle ausdrücklich setzen (protokolliert als `dashboard`) |
+| `GET /api/role-changes` | Protokoll der Rollenwechsel, neueste zuerst |
 | `GET /api/messages` | Nachrichten mit Zustellprotokoll |
 | `POST /api/messages` `{from,to,text}` | Nachricht als Mensch |
 | `GET /api/runner/apps` | welche Werkzeuge startbar sind |
@@ -370,11 +372,15 @@ pnpm typecheck && pnpm test
 alle Projekte, ein **PM** je Repository, **Worker** für die Umsetzung. CrewPip kennt diese
 Rollen als Feld an der Session.
 
-- Die Rolle ergibt sich aus dem Sitzungsnamen: `Director`, `PM <repo>`, `Worker <repo>`.
-  Wer die Namenskonvention einhält, muss nichts weiter tun. Von Hand geht es in der
-  Seitenleiste oder über `PATCH /api/sessions/:id` mit `{"role": "pm"}`.
-- Es gibt höchstens einen Director und höchstens einen PM je Projekt. Eine neue Vergabe
-  nimmt der bisherigen aktiven Session die Rolle ab, statt zu scheitern.
+- Die Rolle ergibt sich aus dem wirksamen Anzeigenamen: `Director`, `PM <repo>`, `Worker <repo>`,
+  gleich ob er per `/rename`, als nativer Titel in Codex oder Claude Desktop oder vom Hook kommt.
+  Wer die Namenskonvention einhält, muss nichts weiter tun.
+- Es gibt höchstens einen Director und höchstens einen PM je Projekt. Ein Name hängt nie still
+  um: Hält ein anderer Chat die Rolle oder beansprucht sie ebenfalls, bleibt alles, wie es ist,
+  und Board sowie `list_sessions` zeigen den Konflikt. Ausdrücklich umgehängt wird im Board
+  („Chats und Rollen verwalten“), mit dem MCP-Werkzeug `set_role` oder über
+  `PATCH /api/sessions/:id` mit `{"role": "pm"}`; dann verliert der bisherige Inhaber die Rolle.
+  Jeder Wechsel steht in `GET /api/role-changes`. Einzelheiten in [docs/rollen.md](docs/rollen.md).
 - `director` und `pm:<projekt>` adressieren die **Rolle, nicht die Sitzung**. Eine Nachricht
   an den PM eines Projekts wartet, bis es dort einen gibt, und übersteht dessen Neustart.
   Das ist der Unterschied zu `session:<id>`, das an ein bestimmtes Fenster geht.
