@@ -4,6 +4,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import fs from "node:fs";
+import { roleFromName } from "@crewpip/shared";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { openDb } from "../src/db.js";
@@ -20,6 +21,47 @@ function setup(titles = new Map<string, string>()) {
   return { db, board, inbox: new Inbox(db, board), titles };
 }
 const role = (inbox: Inbox, id: string) => inbox.sessions().find((s) => s.id === id)?.role ?? null;
+
+test("Nur der vollständige Titel Director beansprucht die Director-Rolle", () => {
+  assert.equal(roleFromName(" dIrEcToR "), "director");
+  assert.equal(roleFromName("Director-Anweisungen einholen"), null);
+  assert.equal(roleFromName("Director kontaktieren"), null);
+  assert.equal(roleFromName("Director: Planung"), null);
+  assert.equal(roleFromName("PM Werkstatt"), "pm");
+  assert.equal(roleFromName("Worker Werkstatt"), "worker");
+});
+
+test("Director-Post erreicht beim Abgleich nativer Titel nur den eigentlichen Director", () => {
+  const { inbox, titles } = setup();
+  inbox.upsertSession({ id: "auftrag", app: "codex", cwd: "/p/werkstatt" });
+  inbox.upsertSession({ id: "leitung", app: "claude", cwd: "/p/leitung" });
+  const message = inbox.post({ sessionId: "auftrag" }, "director", "Bitte prüfen");
+  titles.set("codex:auftrag", "Director-Anweisungen einholen");
+  titles.set("claude:leitung", "Director");
+  inbox.syncNameRoles();
+  assert.equal(role(inbox, "leitung"), "director");
+  assert.equal(inbox.sessions().find(s => s.id === "auftrag")?.roleConflict, null);
+  assert.deepEqual(inbox.take("leitung", "mcp-read").map(m => m.id), [message.id]);
+  inbox.endSession("leitung");
+  assert.equal(role(inbox, "auftrag"), null);
+});
+
+test("Bestehende Director-Zuweisungen bleiben bis zur ausdrücklichen Übergabe gültig", () => {
+  for (const actor of ["name", "dashboard"]) {
+    const { inbox, board, db } = setup();
+    inbox.upsertSession({ id: "inhaber", app: "codex", cwd: "/p/a", name: "Director-Auftrag" });
+    inbox.setRole("inhaber", "director", actor);
+    const restarted = new Inbox(db, board);
+    restarted.upsertSession({ id: "leitung", app: "claude", cwd: "/p/b", name: "Director" });
+    restarted.syncNameRoles();
+    assert.equal(role(restarted, "inhaber"), "director");
+    assert.equal(role(restarted, "leitung"), null);
+    restarted.setRole("leitung", "director", "dashboard");
+    restarted.endSession("leitung");
+    assert.equal(role(restarted, "inhaber"), null);
+    db.close();
+  }
+});
 
 // ---- Kriterium 1: Rolle aus dem wirksamen Anzeigenamen, gleich welche Quelle -------------
 
