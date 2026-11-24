@@ -136,7 +136,7 @@ function ChatDot({ session, edge }: { session: Session; edge: boolean }) {
 /** Symbol der Legende: gleiche Zeichnung wie im Chat-Symbol, damit man sie wiedererkennt. */
 function LegendDot({ state }: { state: "connected" | "no-hook" | "restart-needed" | "stale" | "archived" }) {
   const { ui } = useBoardLanguage();
-  return <span className="legend-item"><span className={`dot dot-${state}`} aria-hidden="true"><svg viewBox="0 0 14 14" width="14" height="14" focusable="false">{APP_SHAPES.claude(14)}</svg></span>{ui.connectionState[state]}</span>;
+  return <span className="legend-item"><span className={`dot dot-${state}`} aria-hidden="true"><svg viewBox="0 0 14 14" width="14" height="14" focusable="false">{APP_SHAPES.claude(14)}</svg></span>{state === "stale" ? `${ui.connectionState.stale} / ${ui.connectionState.unconfirmed}` : ui.connectionState[state]}</span>;
 }
 
 /** Erklärtexte der Übersicht, nur auf Wunsch sichtbar (Knopf neben der Überschrift). */

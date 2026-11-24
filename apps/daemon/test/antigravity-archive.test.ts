@@ -56,7 +56,11 @@ test("Der App-Abgleich prüft Archiv, Entarchivierung und unklare Quellen ohne G
       db.exec("DELETE FROM conversations_fts WHERE chunk_index=-1");
       writeFileSync(annotation, 'title:"archived:true" last_user_view_time:{archived:true}');
       await sync();
-      assert.equal(states.get(id), "open");
+      assert.equal(states.get(id), "unconfirmed");
+      rmSync(annotation);
+      states.clear();
+      await sync();
+      assert.equal(states.get(id), "unconfirmed", "Kein Suchkopf und keine Annotation nach Neustart");
       db.exec("DELETE FROM conversation_summaries");
       await sync();
       assert.equal(states.get(id), "unconfirmed");

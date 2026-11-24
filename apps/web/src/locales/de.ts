@@ -58,7 +58,7 @@ export const de = {
   connectionsIntro: "Jeder Chat ist einzeln mit CrewPip verbunden, nicht direkt mit anderen Chats. CrewPip ist der Briefkasten dazwischen. Die Grafik zeigt je Repo die Chats um CrewPip und, wer in den letzten 24 Stunden tatsächlich Post ausgetauscht hat.",
   matrixInfoLabel: "Erklärung zur Übersicht „Chats an CrewPip“",
   matrixRepo: "Repo",
-  matrixSymbols: "Symbol: Form = App (Kreis Claude, Quadrat Codex, Dreieck Cursor, Sechseck Antigravity). Gefüllt = Post kommt an, hohl = Ohne Hook, hohl mit dickem Rand in Warnfarbe = Neustart nötig, gestrichelt und gedämpft = veraltet, durchgestrichen = archiviert, „·“ = kein Chat dieser App. PM = Projektmanager, D = Director. Zeile aufklappen zeigt Chats, Nachrichtenwege der letzten 24 Stunden und die Grafik.",
+  matrixSymbols: "Symbol: Form = App (Kreis Claude, Quadrat Codex, Dreieck Cursor, Sechseck Antigravity). Gefüllt = Post kommt an, hohl = Ohne Hook, hohl mit dickem Rand in Warnfarbe = Neustart nötig, gestrichelt und gedämpft = veraltet oder unbestätigt, durchgestrichen = archiviert, „·“ = kein Chat dieser App. PM = Projektmanager, D = Director. Zeile aufklappen zeigt Chats, Nachrichtenwege der letzten 24 Stunden und die Grafik.",
   matrixAlert: "PM oder Director ohne Hook oder mit Neustart nötig",
   legendNoChat: "kein Chat",
   legendRole: "PM · D = Rolle",

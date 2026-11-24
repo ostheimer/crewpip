@@ -58,7 +58,7 @@ export const en = {
   connectionsIntro: "Each chat is connected to CrewPip on its own, not directly to other chats. CrewPip is the mailbox in between. The diagram shows the chats around CrewPip per repository and which ones actually exchanged messages in the last 24 hours.",
   matrixInfoLabel: "Explanation of “Chats on CrewPip”",
   matrixRepo: "Repository",
-  matrixSymbols: "Symbol: shape = app (circle Claude, square Codex, triangle Cursor, hexagon Antigravity). Filled = messages arrive, hollow = without hook, hollow with a thick warning-colored outline = restart needed, dashed and dimmed = stale, crossed out = archived, “·” = no chat of this app. PM = project manager, D = director. Expanding a row shows its chats, the message paths of the last 24 hours and the diagram.",
+  matrixSymbols: "Symbol: shape = app (circle Claude, square Codex, triangle Cursor, hexagon Antigravity). Filled = messages arrive, hollow = without hook, hollow with a thick warning-colored outline = restart needed, dashed and dimmed = stale or unconfirmed, crossed out = archived, “·” = no chat of this app. PM = project manager, D = director. Expanding a row shows its chats, the message paths of the last 24 hours and the diagram.",
   matrixAlert: "PM or director without hook or needing a restart",
   legendNoChat: "no chat",
   legendRole: "PM · D = role",
