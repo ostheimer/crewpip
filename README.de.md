@@ -115,8 +115,8 @@ Chats sind nie direkt miteinander verbunden: Jeder Chat ist an CrewPip angeschlo
 | Weg | Claude Code | Cursor | Codex | Antigravity |
 |---|---|---|---|---|
 | Hinterlassen | MCP-Tool `post_message` | MCP-Tool `post_message` | MCP-Tool `post_message` | MCP-Tool `post_message` |
-| Beim nächsten Prompt | UserPromptSubmit-Hook | nur beim Sitzungsstart | UserPromptSubmit-Hook | PreInvocation-Hook vor jedem Modellaufruf, jede Nachricht einmal |
-| Am Ende des Turns | Stop-Hook, Agent macht weiter | stop-Hook, `followup_message` | Stop-Hook, Agent macht weiter | Stop-Hook mit `continue`, Agent macht weiter |
+| Beim nächsten Prompt | UserPromptSubmit-Hook | nur beim Sitzungsstart | UserPromptSubmit-Hook | Abholhinweis über PreInvocation |
+| Am Ende des Turns | Stop-Hook, Agent macht weiter | stop-Hook, `followup_message` | Stop-Hook, Agent macht weiter | Stop-Hook erinnert an die Abholung |
 | Automatisch erkannt | ja, über die Session-Registry | nein, erst per Hook | nein, erst per Hook | nein, erst per Hook |
 | Aktiv warten | `wait_for_message` (bis 50 s) | `wait_for_message` (bis 50 s) | `wait_for_message` (bis 50 s) | `wait_for_message` (bis 50 s) |
 
@@ -276,18 +276,18 @@ Freigabe nötig. Für Automatisierung gibt es `--dangerously-bypass-hook-trust`.
 in `~/.gemini/config/hooks.json` übernehmen. Eine Freigabe wie bei Codex ist nicht nötig; in
 der App lassen sich die Hooks unter Settings › Customizations › Hooks ein- und ausschalten.
 
-Unterschiede zu den anderen Apps (geprüft mit Antigravity 2.33 am 20.11.2026):
+So holt Antigravity seine Post ab:
 
 - **Kein UserPromptSubmit.** Der Prompt-Weg hängt an `PreInvocation`, das vor jedem
-  Modellaufruf feuert, auch mitten im Turn. Jede Nachricht wird trotzdem nur einmal
-  eingespielt, weil der Daemon den Zustellnachweis prüft. Eingespielt wird als
-  `userMessage`; die Post erscheint im Gespräch deshalb als Nachricht mit `[CrewPip]` vorne.
-- **Turn-Ende:** `Stop` antwortet mit `"decision": "continue"`, die Post steht in `reason`.
+  Modellaufruf feuert, auch mitten im Turn. Der Hook gibt einen festen Abholhinweis aus.
+  Erst der Abruf mit `read_inbox` oder `wait_for_message` liefert den Inhalt und erzeugt
+  den Zustellbeleg. Bleibt der Hinweis aus, ist die Post weiterhin abrufbar.
+- **Turn-Ende:** `Stop` antwortet mit `"decision": "continue"`, in `reason` steht die Erinnerung an die Abholung.
   Danach ruft Antigravity das Modell erneut auf; `PreInvocation` kommt dann mit
   `invocationNum` 1 statt 0. Die Schleifensperre hebt deshalb nur ein `PreInvocation` mit
   `invocationNum` 0 auf, also der erste Modellaufruf nach einer Eingabe des Menschen.
-- **Sitzungsschlüssel:** Jede Einspielung bleibt im Gespräch sichtbar stehen. Der Schlüssel
-  kommt deshalb nur zu Beginn eines Turns oder zusammen mit Post, nicht bei jedem Modellaufruf.
+- **Sitzungsschlüssel:** Der Schlüssel kommt bei Bedarf zum Sitzungsstart, zu Beginn eines Turns
+  oder mit einem Abholhinweis.
 - **Identität:** Das Gespräch heißt `conversationId`, das Projekt kommt aus `cwd`
   (bzw. `workspacePaths`). Alle Gespräche laufen über den `language_server` der App; arbeiten
   zwei im selben Ordner, trennt sie der Sitzungsschlüssel wie bei Codex.

@@ -807,6 +807,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
 
   /** Wartet bis eine passende Nachricht eintrifft oder die Zeit abläuft. Gibt sie als zugestellt zurück. */
   async waitFor(sessionId: string, timeoutMs: number, signal?: AbortSignal, method: DeliveryMethod = "mcp-wait"): Promise<Message[]> {
+    if (signal?.aborted) return [];
     const immediate = this.take(sessionId, method);
     if (immediate.length) return immediate;
     return new Promise<Message[]>((resolve) => {
@@ -817,6 +818,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
         resolve(msgs);
       };
       const onMessage = () => {
+        if (signal?.aborted) return done([]);
         const got = this.take(sessionId, method);
         if (got.length) done(got);
       };
@@ -824,6 +826,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
       const timer = setTimeout(() => done([]), timeoutMs);
       this.on("message", onMessage);
       signal?.addEventListener("abort", onAbort, { once: true });
+      if (signal?.aborted) onAbort();
     });
   }
 

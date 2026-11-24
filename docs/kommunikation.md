@@ -30,8 +30,8 @@ Nachrichten austauschen, zeigen die Übersicht im Board und die Zustellnachweise
 - **Hooks.** Die App startet bei Sitzungsstart, Prompt (nicht bei Cursor; bei Antigravity vor jedem
   Modellaufruf), Turn-Ende und Sitzungsende (nicht bei Antigravity) das Skript
   `apps/hook/crewpip-hook.mjs`. Es meldet den Chat an (`/hooks/<app>/<ereignis>` in
-  `apps/daemon/src/http.ts`) und bringt wartende Post in den Chat. Nur der Hook stellt Post von
-  selbst zu.
+  `apps/daemon/src/http.ts`) und bringt wartende Post in den Chat. Bei Antigravity meldet der Hook, dass Post wartet.
+  Der Chat holt sie mit `read_inbox` oder `wait_for_message` ab. Erst dann entsteht der Zustellbeleg.
 
 ## Zustellwege
 
@@ -42,9 +42,9 @@ eine App bekommt, steht in `apps/daemon/src/setup.ts`, wie die Post in den Chat 
 | Weg | Claude Code | Codex | Cursor | Antigravity |
 |---|---|---|---|---|
 | Hinterlassen | `post_message` | `post_message` | `post_message` | `post_message` |
-| Beim Sitzungsstart | SessionStart-Hook | SessionStart-Hook | sessionStart-Hook | SessionStart-Hook |
-| Beim nächsten Prompt | UserPromptSubmit-Hook | UserPromptSubmit-Hook | nein, nur beim Sitzungsstart | PreInvocation-Hook vor dem Modellaufruf, jede Nachricht nur einmal |
-| Am Turn-Ende | Stop-Hook, der Chat arbeitet mit der Post weiter | Stop-Hook, der Chat arbeitet mit der Post weiter | stop-Hook mit `followup_message` | Stop-Hook mit `continue`, der Chat arbeitet mit der Post weiter |
+| Beim Sitzungsstart | SessionStart-Hook | SessionStart-Hook | sessionStart-Hook | Abholhinweis beim Sitzungsstart |
+| Beim nächsten Prompt | UserPromptSubmit-Hook | UserPromptSubmit-Hook | nein, nur beim Sitzungsstart | Abholhinweis über PreInvocation |
+| Am Turn-Ende | Stop-Hook, der Chat arbeitet mit der Post weiter | Stop-Hook, der Chat arbeitet mit der Post weiter | stop-Hook mit `followup_message` | Stop-Hook mit `continue` erinnert an die Abholung |
 | Selbst abholen | `read_inbox` | `read_inbox` | `read_inbox` | `read_inbox` |
 | Aktiv warten | `wait_for_message`, bis 50 s je Aufruf | ebenso | ebenso | ebenso |
 
@@ -126,8 +126,7 @@ den Chat, der sie abgeholt hat. Nicht abgeholte Post erscheint nicht.
 - **Antigravity: ein Prozess, kein Sitzungsende.** Alle Gespräche der Antigravity-App laufen
   über einen `language_server`-Prozess, und die Hooks aus `~/.gemini/config/hooks.json` gelten
   für App, IDE und CLI gemeinsam. Antigravity hat kein UserPromptSubmit: Der PreInvocation-Hook
-  feuert vor jedem Modellaufruf, auch mitten im Turn; der Zustellnachweis sorgt dafür, dass jede
-  Nachricht nur einmal ankommt. Die Schleifensperre hebt nur ein neuer menschlicher Prompt auf,
+  feuert vor jedem Modellaufruf, auch mitten im Turn. Ein ausbleibender Hinweis lässt die Post zur Abholung bereitliegen. Die Schleifensperre hebt nur ein neuer menschlicher Prompt auf,
   nicht der erneute Modellaufruf nach einer Fortsetzung. Die App meldet kein Sitzungsende. CrewPip zeigt Gespräche, die ihr lokaler Index als archiviert ausweist, als „Archiviert“. Arbeiten zwei Gespräche im selben Ordner, trennt
   sie der Sitzungsschlüssel.
 - **Nur dieser Mac.** Jeder Rechner hat sein eigenes Board. Chats auf zwei Rechnern erreichen

@@ -111,6 +111,39 @@ test("MCP: wait_for_message wacht auf, wenn ein Mensch an das Projekt schreibt",
   await codex.close();
 });
 
+for (const name of ["read_inbox", "wait_for_message"]) {
+  test(`MCP: Verbindungsabbruch während der Identitätsprüfung lässt Post für ${name} liegen`, { timeout: 5000 }, async (t) => {
+    const cwd = `/p/abbruch-${name}`;
+    const id = `abbruch-${name}`;
+    daemon.inbox.upsertSession({ id, app: "antigravity", cwd });
+    const message = daemon.inbox.post({ human: "Mensch" }, `session:${id}`, "für den nächsten Abruf");
+
+    const searching = Promise.withResolvers<void>();
+    const owner = Promise.withResolvers<null>();
+    t.mock.method(probe, "owner", () => {
+      searching.resolve();
+      return owner.promise;
+    });
+    const closed = new Promise<void>((resolve) => daemon.server.once("request", (_req, res) => res.once("close", resolve)));
+    const controller = new AbortController();
+    const request = get(`${base}/mcp/antigravity`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: { cwd } } }),
+      signal: controller.signal,
+    }).then(response => response.text());
+    await searching.promise;
+    controller.abort();
+    await assert.rejects(request, { name: "AbortError" });
+    await closed;
+    owner.resolve(null);
+    // Die Identität ist ermittelt, der Handler und seine Folge-Promises sind gelaufen.
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.deepEqual(daemon.inbox.message(message.id)!.deliveries, []);
+    assert.deepEqual(daemon.inbox.pendingFor(id).map(m => m.id), [message.id]);
+  });
+}
+
 test("Hooks: prompt liefert Ausstehendes, stop respektiert die Schleifensperre", async () => {
   // Die Projekt-Nachricht von oben wartet noch bei c-example
   let r = await hook("claude", "prompt", { app: "claude", sessionId: "c-example", cwd: "/p/example-project" });

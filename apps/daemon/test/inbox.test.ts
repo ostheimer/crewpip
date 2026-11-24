@@ -93,6 +93,21 @@ test("waitFor wacht bei passender Nachricht auf und ignoriert fremde", async () 
   assert.equal(got[0]!.deliveries[0]!.method, "mcp-wait");
 });
 
+test("waitFor lässt Post bei einem Abbruch vor der Abholung und beim Aufwachen liegen", async () => {
+  const inbox = fresh();
+  inbox.upsertSession({ id: "c1", app: "antigravity", cwd: "/p/a" });
+  const controller = new AbortController();
+  // EventEmitter ruft bei emit auch einen Listener auf, der inzwischen entfernt wurde.
+  inbox.once("message", () => controller.abort());
+  const waiting = inbox.waitFor("c1", 2000, controller.signal);
+  const msg = inbox.post({ human: "Mensch" }, "session:c1", "bleibt im Postfach");
+  assert.deepEqual(await waiting, []);
+  assert.deepEqual(await inbox.waitFor("c1", 2000, controller.signal), []);
+  assert.deepEqual(inbox.pendingFor("c1").map(m => m.id), [msg.id]);
+  assert.deepEqual(inbox.message(msg.id)!.deliveries, []);
+  assert.equal(inbox.listenerCount("message"), 0);
+});
+
 test("waitFor läuft in den Timeout, wenn nichts kommt", async () => {
   const inbox = fresh();
   inbox.upsertSession({ id: "c1", app: "claude", cwd: "/p/a" });

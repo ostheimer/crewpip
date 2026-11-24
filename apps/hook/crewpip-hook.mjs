@@ -5,7 +5,7 @@
  *   node crewpip-hook.mjs <claude|cursor|codex|antigravity> <session-start|prompt|stop|session-end>
  *
  * Antigravity kennt kein UserPromptSubmit; dort hängt "prompt" an PreInvocation, das vor jedem
- * Modellaufruf feuert. Doppelte Zustellung verhindert der Daemon über den Zustellnachweis.
+ * Modellaufruf feuert. Ein Hinweis fordert zur Abholung über MCP auf.
  *
  * Liest das Hook-Payload der App von stdin, meldet es dem Daemon und übersetzt die
  * Antwort in das Ausgabeformat der jeweiligen App. Läuft der Daemon nicht oder geht
@@ -100,17 +100,18 @@ export function turnStartOf(app, payload) {
   return payload.invocationNum === 0;
 }
 
-/**
- * Ein Schritt, den Antigravity in das Gespräch einspielt. Real geprüft am 20.11.2026: Ein
- * userMessage erreicht das Modell, bleibt im Verlauf und ist für den Menschen sichtbar.
- * ephemeralMessage wäre nur für einen Modellaufruf da, systemMessage ist in der Doku uneinheitlich.
- */
-export function antigravityStep(text) {
-  return { userMessage: text };
-}
-
 /** Übersetzt die Daemon-Antwort in das Hook-Ausgabeformat der App. Gibt null zurück, wenn nichts auszugeben ist. */
 export function formatOutput(app, event, response) {
+  if (app === "antigravity") {
+    const notice = response?.inboxNotice === true;
+    const key = response?.sessionKey ? renderSessionKey(response.sessionKey) : null;
+    if (!notice && (!key || event === "stop")) return null;
+    const hint = notice ? "[CrewPip] Post wartet. Hole sie mit dem MCP-Werkzeug crewpip read_inbox ab." : null;
+    const text = [hint, key].filter(Boolean).join("\n\n");
+    if (event === "prompt" || event === "session-start") return { injectSteps: [{ systemMessage: { systemMessage: text } }] };
+    if (event === "stop" && response.mayContinue !== false) return { decision: "continue", reason: text };
+    return null;
+  }
   const msgs = response?.messages ?? [];
   // Der Schlüssel geht nur über Ereignisse, die Kontext einspeisen. Bei "stop" wird der Turn
   // blockiert; das darf nie allein wegen des Schlüssels geschehen, sonst entsteht eine
@@ -119,12 +120,6 @@ export function formatOutput(app, event, response) {
   const key = schluesselErlaubt && response?.sessionKey ? response.sessionKey : null;
   if (!msgs.length && !key) return null;
   const text = [key ? renderSessionKey(key) : null, msgs.length ? renderMessages(msgs) : null].filter(Boolean).join("\n\n---\n\n");
-  if (app === "antigravity") {
-    if (event === "session-start" || event === "prompt") return { injectSteps: [antigravityStep(text)] };
-    // "continue" lässt den Agenten weiterlaufen; reason wird als Systemnachricht eingespielt.
-    if (event === "stop") return { decision: "continue", reason: text };
-    return null;
-  }
   if (app === "cursor") {
     if (event === "session-start") return { additional_context: text };
     if (event === "stop") return { followup_message: text };
@@ -156,7 +151,10 @@ export async function callDaemon({ app, event, payload, env, fetchImpl = fetch }
     payload: { hook_event_name: payload.hook_event_name, stop_hook_active: payload.stop_hook_active, status: payload.status },
   };
   const token = readToken(env);
-  const res = await fetchImpl(`${base}/hooks/${app}/${event}`, {
+  // Ein alter Daemon kennt den Hinweis-Endpunkt nicht. Während eines Updates bleibt Post
+  // deshalb liegen, statt noch über den alten, direkt quittierenden Hook verlorenzugehen.
+  const hookPath = app === "antigravity" ? "antigravity/notice" : app;
+  const res = await fetchImpl(`${base}/hooks/${hookPath}/${event}`, {
     method: "POST",
     headers: { "content-type": "application/json", ...(token ? { "x-crewpip-token": token } : {}) },
     body: JSON.stringify(body),
