@@ -77,6 +77,8 @@ is documented in [verbindung.md](verbindung.md) (German).
 | Messages arrive | Connected to CrewPip: the hook has reported and the app is running. Messages arrive at the next turn, even while the chat is idle. |
 | Without hook | CrewPip knows the chat, but its hook has never reported. Whether messages arrive on their own is uncertain; the chat can always fetch them with `read_inbox` or `wait_for_message`. |
 | Restart needed | The chat is running and has had at least one turn since it started, but its hook never reported. It did not load the CrewPip hooks, usually because it was already running when they were set up. Only a restart of the chat connects it. |
+| Unconfirmed | The shared app process is running, but the conversation archive status is currently unavailable. |
+| Archived | Antigravity lists the conversation in its local archive. Pending mail waits for the next contact. |
 | Stale | The chat's app is no longer running. The entry was left behind. |
 | Ended | Unregistered. No longer shown as a chat in the overview; its message paths from the last 24 hours stay in the list, marked “ended”. |
 
@@ -122,8 +124,7 @@ picked up do not appear.
   through one `language_server` process, and the hooks in `~/.gemini/config/hooks.json` apply to
   the app, IDE and CLI alike. Antigravity has no UserPromptSubmit: the PreInvocation hook fires
   before every model call, also in the middle of a turn. Mail remains available if the chat misses the notice. Only a new human prompt lifts the loop guard, not the repeated model call
-  after a continuation. A conversation never signs off and counts as connected while the app is
-  running. If two conversations work in the same folder, the session key tells them apart.
+  after a continuation. The app reports no session end. CrewPip shows conversations marked in its local archive index as “Archived”. If two conversations work in the same folder, the session key tells them apart.
 - **This Mac only.** Every computer has its own board. Chats on two computers cannot reach each
   other.
 - **No service, no messages.** If the service is not running, the hook exits silently with exit

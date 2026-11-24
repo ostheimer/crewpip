@@ -76,7 +76,7 @@ for (const [file, readme, headings] of [
     assert.ok(doc.includes("verbindung.md"), "Verweis auf die Verbindungsregel fehlt");
     const locale = read(`apps/web/src/locales/${file.endsWith("kommunikation.md") ? "de" : "en"}.ts`);
     const labels = [...locale.match(/connectionState: \{([^}]*)\}/)[1].matchAll(/: "([^"]+)"/g)].map(m => m[1]);
-    assert.equal(labels.length, 5);
+    assert.equal(labels.length, 7);
     for (const label of labels) assert.ok(doc.includes(`| ${label} |`), `Zustand ${label} fehlt oder heißt anders als im Board`);
   });
 }

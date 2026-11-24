@@ -134,9 +134,9 @@ function ChatDot({ session, edge }: { session: Session; edge: boolean }) {
 }
 
 /** Symbol der Legende: gleiche Zeichnung wie im Chat-Symbol, damit man sie wiedererkennt. */
-function LegendDot({ state }: { state: "connected" | "no-hook" | "restart-needed" | "stale" }) {
+function LegendDot({ state }: { state: "connected" | "no-hook" | "restart-needed" | "stale" | "archived" }) {
   const { ui } = useBoardLanguage();
-  return <span className="legend-item"><span className={`dot dot-${state}`} aria-hidden="true"><svg viewBox="0 0 14 14" width="14" height="14" focusable="false">{APP_SHAPES.claude(14)}</svg></span>{ui.connectionState[state]}</span>;
+  return <span className="legend-item"><span className={`dot dot-${state}`} aria-hidden="true"><svg viewBox="0 0 14 14" width="14" height="14" focusable="false">{APP_SHAPES.claude(14)}</svg></span>{state === "stale" ? `${ui.connectionState.stale} / ${ui.connectionState.unconfirmed}` : ui.connectionState[state]}</span>;
 }
 
 /** Erklärtexte der Übersicht, nur auf Wunsch sichtbar (Knopf neben der Überschrift). */
@@ -149,7 +149,7 @@ function InfoPanel() {
       onClick={() => setOpen(o => !o)} onKeyDown={e => { if (e.key === "Escape") setOpen(false); }}><Info size={16} aria-hidden="true" /></button>
     {open && <div id={id} className="info-panel" role="region" aria-label={ui.matrixInfoLabel} onKeyDown={e => { if (e.key === "Escape") setOpen(false); }}>
       <p>{ui.connectionsIntro}</p>
-      <ul>{(["connected", "no-hook", "restart-needed", "stale"] as const).map(k => <li key={k}><strong>{ui.connectionState[k]}:</strong> {ui.connectionHint[k]}</li>)}</ul>
+      <ul>{(["connected", "no-hook", "restart-needed", "stale", "archived", "unconfirmed"] as const).map(k => <li key={k}><strong>{ui.connectionState[k]}:</strong> {ui.connectionHint[k]}</li>)}</ul>
       <p>{ui.matrixSymbols}</p>
     </div>}
   </>;
@@ -209,7 +209,7 @@ export function Connections({ sessions, projects, projectId, flows }: { sessions
   const liveIds = new Set(sessions.filter(s => s.connection !== "ended").map(s => s.id));
   return <section className="connections" aria-labelledby="connections-title">
     <div className="section-heading matrix-heading"><h2 id="connections-title">{ui.connectionsTitle}</h2><InfoPanel /></div>
-    <p className="matrix-legend"><LegendDot state="connected" /><LegendDot state="no-hook" /><LegendDot state="restart-needed" /><LegendDot state="stale" /><span className="legend-item"><span className="dot-none" aria-hidden="true">·</span>{ui.legendNoChat}</span><span className="legend-item legend-role">{ui.legendRole}</span></p>
+    <p className="matrix-legend"><LegendDot state="connected" /><LegendDot state="no-hook" /><LegendDot state="restart-needed" /><LegendDot state="stale" /><LegendDot state="archived" /><span className="legend-item"><span className="dot-none" aria-hidden="true">·</span>{ui.legendNoChat}</span><span className="legend-item legend-role">{ui.legendRole}</span></p>
     {rows.length > 0 && <table className="conn-matrix">
       <caption className="sr-only">{ui.connectionsTitle}</caption>
       <thead><tr><th scope="col">{ui.matrixRepo}</th>{apps.map(a => <th scope="col" key={a}><AppMark app={a} /></th>)}</tr></thead>

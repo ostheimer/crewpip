@@ -24,9 +24,11 @@ export type SessionStatus = "idle" | "working" | "ended";
  * - "restart-needed": der Prozess läuft und hatte seit seinem Start einen Turn, aber von ihm
  *   kam nie ein Hook. Er hat die CrewPip-Hooks nicht geladen; erst ein Neustart hilft (#21).
  * - "stale": der Agent-Prozess läuft nicht mehr, der Eintrag ist liegen geblieben.
+ * - "unconfirmed": CrewPip kann den Archivstatus der laufenden Antigravity-App nicht bestätigen.
+ * - "archived": die Antigravity-App führt dieses Gespräch im lokalen Archiv.
  * - "ended": ausgetragen.
  */
-export const CONNECTION_STATES = ["connected", "no-hook", "restart-needed", "stale", "ended"] as const;
+export const CONNECTION_STATES = ["connected", "no-hook", "restart-needed", "stale", "archived", "unconfirmed", "ended"] as const;
 export type ConnectionState = (typeof CONNECTION_STATES)[number];
 
 export const SESSION_ROLES = ["director", "pm", "worker"] as const;

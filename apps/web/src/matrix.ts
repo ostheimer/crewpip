@@ -3,7 +3,7 @@ import type { AppKind, ConnectionState, Project, Session } from "@crewpip/shared
 /** Feste Reihenfolge der Spalten; es erscheinen nur Apps, die auf diesem Mac vorkommen. */
 export const APP_ORDER: AppKind[] = ["claude", "codex", "cursor", "antigravity", "other"];
 
-const STATE_ORDER: Record<ConnectionState, number> = { connected: 0, "no-hook": 1, "restart-needed": 2, stale: 3, ended: 4 };
+const STATE_ORDER: Record<ConnectionState, number> = { connected: 0, "no-hook": 1, "restart-needed": 2, stale: 3, archived: 4, unconfirmed: 5, ended: 6 };
 
 export interface MatrixRow {
   id: string;
