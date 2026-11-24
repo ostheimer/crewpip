@@ -11,7 +11,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { parseTarget, APP_LABELS } from "@crewpip/shared";
+import { parseTarget, APP_LABELS, type HookResponse, type Message } from "@crewpip/shared";
 import { openDb } from "../src/db.js";
 import { Inbox } from "../src/inbox.js";
 import { Board } from "../src/board.js";
@@ -47,7 +47,8 @@ function get(url: string, init: RequestInit = {}): Promise<Response> {
 }
 async function hook(event: string, body: Record<string, unknown>) {
   const res = await get(`${base}/hooks/antigravity/${event}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ app: "antigravity", ...body }) });
-  return (await res.json()) as { session: { id: string; label: string } | null; messages: { text: string }[]; mayContinue: boolean; sessionKey?: string };
+  assert.equal(res.status, 200);
+  return (await res.json()) as HookResponse;
 }
 const postHuman = (to: string, text: string) =>
   get(`${base}/api/messages`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ from: "Mensch", to, text }) });
@@ -69,40 +70,63 @@ test("Hook meldet ein Antigravity-Gespräch unter seiner conversationId an", asy
   assert.equal(s.connection, "stale", "Testprozess lebt nicht; entscheidend ist, dass die Kette gespeichert ist");
 });
 
-test("PreInvocation: jede Nachricht genau einmal, auch bei vielen Modellaufrufen im Turn", async () => {
-  await postHuman("session:ag-1", "#20 eins");
-  const first = await hook("prompt", { sessionId: "ag-1", cwd: "/p/ag-projekt", turnStart: true });
-  assert.deepEqual(first.messages.map((m) => m.text), ["#20 eins"]);
+test("Antigravity-Hooks lassen Post bis zur einmaligen Übernahme über MCP im Postfach", async (t) => {
+  const cwd = "/p/abholung";
+  const sessionId = "ag-abholung";
+  const payload = { sessionId, cwd };
+  await hook("session-start", payload);
+  await postHuman(`session:${sessionId}`, "Prüfwort 36");
+  const deliveries = async () => {
+    const messages = await (await get(`${base}/api/messages`)).json() as Message[];
+    return messages.find(m => m.text === "Prüfwort 36")!.deliveries.map(d => d.method);
+  };
+  const start = await hook("session-start", payload);
+  assert.deepEqual(start.messages, [], "Start-Hook erhält keine Nachrichteninhalte");
+  assert.equal(start.inboxNotice, true);
+  const req = { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) };
+  const denied = await fetch(`${base}/hooks/antigravity/notice/prompt`, req);
+  assert.equal(denied.status, 401, "der Hinweis-Endpunkt verlangt wie bisher das lokale Token");
+  const prompt = await hook("prompt", { ...payload, turnStart: true });
+  assert.deepEqual(prompt.messages, []);
   for (let i = 0; i < 3; i++) {
-    const again = await hook("prompt", { sessionId: "ag-1", cwd: "/p/ag-projekt", turnStart: false });
-    assert.deepEqual(again.messages, [], `Modellaufruf ${i + 2}: nichts doppelt`);
+    assert.ok(!(await hook("prompt", { ...payload, turnStart: false })).inboxNotice);
   }
-  const msgs = (await (await get(`${base}/api/messages`)).json()) as { text: string; deliveries: { sessionId: string; method: string }[] }[];
-  const d = msgs.find((m) => m.text === "#20 eins")!.deliveries;
-  assert.deepEqual(d.map((x) => [x.sessionId, x.method]), [["ag-1", "hook-prompt"]], "genau ein Zustellnachweis");
+  const stop = await hook("stop", payload);
+  assert.equal(stop.inboxNotice, true, "Stop bietet einen weiteren Abholweg");
+  assert.ok(!(await hook("stop", payload)).inboxNotice, "derselbe Rückstand startet keine Endlosschleife");
+  const newHook = await get(`${base}/hooks/antigravity/notice/prompt`, req);
+  assert.equal(newHook.status, 200);
+  assert.deepEqual(((await newHook.json()) as HookResponse).messages, [], "der versionierte Hinweis-Endpunkt quittiert ebenfalls nichts");
+  assert.deepEqual(await deliveries(), [], "keine vermeintliche Zustellung durch Hooks");
+  const client = new Client({ name: "abnahmetest", version: "1" });
+  await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp/antigravity?app=antigravity`), { requestInit: { headers: { "x-crewpip-token": TOKEN } } }));
+  t.after(() => client.close());
+  const read = () => client.callTool({ name: "read_inbox", arguments: { cwd } });
+  assert.match(text(await client.callTool({ name: "list_sessions", arguments: { cwd } })), /\* Antigravity/);
+  const pair = await Promise.all([read(), read()]);
+  assert.equal(pair.filter(r => text(r).includes("Prüfwort 36")).length, 1);
+  assert.deepEqual(await deliveries(), ["mcp-read"]);
+  await postHuman(`session:${sessionId}`, "Prüfwort warten");
+  assert.equal((await hook("prompt", { ...payload, turnStart: false })).inboxNotice, true);
+  const wait = await client.callTool({ name: "wait_for_message", arguments: { cwd, timeout_seconds: 1 } });
+  assert.match(text(wait), /Prüfwort warten/);
+  assert.doesNotMatch(text(await read()), /Prüfwort/);
+  assert.ok(!(await hook("stop", payload)).inboxNotice);
 });
 
-test("Schleifensperre: PreInvocation im selben Turn hebt sie nicht auf, ein neuer Prompt schon", async () => {
+test("Schleifensperre bleibt bei PreInvocation im selben Turn erhalten", async () => {
+  const payload = { sessionId: "ag-1", cwd: "/p/ag-projekt" };
   const max = 10;
   for (let i = 0; i < max; i++) daemon.inbox.countStopContinuation("ag-1", max);
   await postHuman("session:ag-1", "#20 gesperrt");
-  let stop = await hook("stop", { sessionId: "ag-1", cwd: "/p/ag-projekt" });
-  assert.equal(stop.mayContinue, false, "Sperre greift");
-  // Nach einem Stop mit "continue" ruft Antigravity das Modell erneut auf; PreInvocation
-  // feuert mit demselben Turn. Das darf die Sperre nicht zurücksetzen.
-  await hook("prompt", { sessionId: "ag-1", cwd: "/p/ag-projekt", turnStart: false });
-  stop = await hook("stop", { sessionId: "ag-1", cwd: "/p/ag-projekt" });
-  assert.equal(stop.mayContinue, true, "PreInvocation hat die Nachricht schon zugestellt, nichts mehr offen");
-  await postHuman("session:ag-1", "#20 noch eine");
-  stop = await hook("stop", { sessionId: "ag-1", cwd: "/p/ag-projekt" });
-  assert.equal(stop.mayContinue, false, "gleicher Turn: Sperre bleibt");
-  // Ein neuer menschlicher Prompt ist ein neuer Turn.
-  const neu = await hook("prompt", { sessionId: "ag-1", cwd: "/p/ag-projekt", turnStart: true });
-  assert.deepEqual(neu.messages.map((m) => m.text), ["#20 noch eine"]);
-  await postHuman("session:ag-1", "#20 nach Prompt");
-  stop = await hook("stop", { sessionId: "ag-1", cwd: "/p/ag-projekt" });
+  assert.equal((await hook("stop", payload)).mayContinue, false);
+  await hook("prompt", { ...payload, turnStart: false });
+  assert.ok(!(await hook("stop", payload)).inboxNotice);
+  await hook("prompt", { ...payload, turnStart: true });
+  const stop = await hook("stop", payload);
   assert.equal(stop.mayContinue, true);
-  assert.deepEqual(stop.messages.map((m) => m.text), ["#20 nach Prompt"]);
+  assert.equal(stop.inboxNotice, true);
+  assert.equal(daemon.inbox.pendingFor("ag-1")[0]?.text, "#20 gesperrt");
 });
 
 test("Zwei Gespräche im selben Repo teilen den Prozess: Schlüssel trennt sie, ohne Schlüssel wird abgelehnt", async () => {
@@ -120,7 +144,8 @@ test("Zwei Gespräche im selben Repo teilen den Prozess: Schlüssel trennt sie, 
   await postHuman("session:ag-a", "#20 an a");
   const mitPost = await hook("prompt", { sessionId: "ag-a", cwd, turnStart: false });
   assert.equal(mitPost.sessionKey, keyA, "mit Post reist der Schlüssel mit");
-  assert.deepEqual(mitPost.messages.map((m) => m.text), ["#20 an a"]);
+  assert.equal(mitPost.inboxNotice, true);
+  assert.deepEqual(mitPost.messages, []);
 
   const client = new Client({ name: "test", version: "0.0.0" });
   await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp/antigravity?app=antigravity`), { requestInit: { headers: { "x-crewpip-token": TOKEN } } }));
@@ -137,6 +162,8 @@ test("Zwei Gespräche im selben Repo teilen den Prozess: Schlüssel trennt sie, 
   assert.match(text(ohne), /nicht sicher erkennen/);
   assert.doesNotMatch(text(await call("list_sessions", {})), /\* Antigravity/, "ohne Schlüssel kein Stern");
   assert.match(text(await call("list_sessions", { session_key: keyA })), /\* Antigravity \/ /, "eigener Stern");
+  assert.doesNotMatch(text(await call("read_inbox", { session_key: keyB })), /#20 an a/);
+  assert.match(text(await call("read_inbox", { session_key: keyA })), /#20 an a/);
   assert.match(text(await call("post_message", { to: "all", text: "#20 mit", session_key: keyB })), /von Antigravity · ag-gemeinsam \//);
   await client.close();
 });

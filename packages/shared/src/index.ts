@@ -318,6 +318,8 @@ export interface HookRequest {
 export interface HookResponse {
   session: { id: string; label: string } | null;
   messages: Message[];
+  /** Antigravity soll über MCP abholen. Die Post bleibt bis dahin im Postfach. */
+  inboxNotice?: boolean;
   /** Nur bei "stop": false, wenn die Schleifensperre greift */
   mayContinue: boolean;
   /**

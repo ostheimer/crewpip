@@ -50,6 +50,7 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
   } = {}): DaemonHandle {
   const log = opts.log ?? ((l: string) => console.log(l));
   const probe = opts.probe ?? systemProbe();
+  const antigravityNotices = new Map<string, { firstPending: number; prompt: boolean; stop: boolean }>();
   const app = express();
   app.use(express.json({ limit: "2mb" }));
 
@@ -90,14 +91,14 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
   });
 
   // -------------------------------------------------------------- Hooks
-  app.post("/hooks/:app/:event", async (req: Request, res: Response) => {
+  app.post(["/hooks/:app/:event", "/hooks/antigravity/notice/:event"], async (req: Request, res: Response) => {
     const event = req.params.event as string;
     if (!(HOOK_EVENTS as readonly string[]).includes(event)) {
       res.status(404).json({ error: `Unbekanntes Hook-Ereignis: ${event}` });
       return;
     }
     const body = (req.body ?? {}) as Partial<HookRequest>;
-    const kind = appKind(body.app ?? req.params.app);
+    const kind = req.params.app ? appKind(body.app ?? req.params.app) : "antigravity";
     const sessionId = typeof body.sessionId === "string" && body.sessionId ? body.sessionId : null;
     const cwd = typeof body.cwd === "string" && body.cwd ? body.cwd : null;
     const response: HookResponse = { session: null, messages: [], mayContinue: true };
@@ -135,33 +136,56 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
     // Antigravity meldet "prompt" vor jedem Modellaufruf (PreInvocation); nur der erste nach einer
     // Eingabe des Menschen ist ein neuer Turn.
     const turnStart = body.turnStart !== false;
-    switch (event) {
-      case "session-start":
-        inbox.resetStopContinuations(session.id);
-        response.messages = inbox.take(session.id, "hook-start");
-        break;
-      case "prompt":
-        // Ein menschlicher Prompt hebt die Schleifensperre auf, ein weiterer Modellaufruf im
-        // selben Turn (auch nach einem Stop mit "continue") nicht.
-        if (turnStart) inbox.resetStopContinuations(session.id);
-        response.messages = inbox.take(session.id, "hook-prompt");
-        break;
-      case "stop": {
-        const pending = inbox.pendingFor(session.id);
-        if (pending.length) {
-          response.mayContinue = inbox.countStopContinuation(session.id, config.maxStopContinuations);
-          if (response.mayContinue) {
-            response.messages = inbox.take(session.id, "hook-stop");
-            inbox.setStatus(session.id, "working");
-          } else log(`[hooks] ${session.label}: Schleifensperre, ${pending.length} Nachricht(en) bleiben liegen`);
+    if (event === "session-start" || (event === "prompt" && turnStart)) inbox.resetStopContinuations(session.id);
+    if (kind === "antigravity" && event !== "session-end") {
+      // Vor der Abholung können Hooks verloren gehen. Nur die erste offene ID dient zur
+      // Entprellung des Hinweises; ein Neustart darf wieder erinnern.
+      const firstPending = inbox.pendingFor(session.id, 1)[0]?.id;
+      if (firstPending === undefined) antigravityNotices.delete(session.id);
+      else {
+        let notice = antigravityNotices.get(session.id);
+        const newTurnAfterStop = event === "prompt" && turnStart && notice?.stop;
+        if (!notice || notice.firstPending !== firstPending || event === "session-start" || newTurnAfterStop) {
+          notice = { firstPending, prompt: false, stop: false };
+          antigravityNotices.set(session.id, notice);
         }
-        break;
+        const phase = event === "stop" ? "stop" : "prompt";
+        if (!notice[phase]) {
+          if (phase === "stop") response.mayContinue = inbox.countStopContinuation(session.id, config.maxStopContinuations);
+          if (response.mayContinue) {
+            notice.prompt = true;
+            if (phase === "stop") notice.stop = true;
+            response.inboxNotice = true;
+            if (phase === "stop") inbox.setStatus(session.id, "working");
+          }
+        }
       }
-      case "session-end":
-        inbox.endSession(session.id);
-        break;
-      default:
-        break;
+    } else {
+      switch (event) {
+        case "session-start":
+          response.messages = inbox.take(session.id, "hook-start");
+          break;
+        case "prompt":
+          response.messages = inbox.take(session.id, "hook-prompt");
+          break;
+        case "stop": {
+          const pending = inbox.pendingFor(session.id);
+          if (pending.length) {
+            response.mayContinue = inbox.countStopContinuation(session.id, config.maxStopContinuations);
+            if (response.mayContinue) {
+              response.messages = inbox.take(session.id, "hook-stop");
+              inbox.setStatus(session.id, "working");
+            } else log(`[hooks] ${session.label}: Schleifensperre, ${pending.length} Nachricht(en) bleiben liegen`);
+          }
+          break;
+        }
+        case "session-end":
+          antigravityNotices.delete(session.id);
+          inbox.endSession(session.id);
+          break;
+        default:
+          break;
+      }
     }
 
     // Teilen sich mehrere Chats dieser App Prozess und Verzeichnis, kann CrewPip sie am
@@ -174,13 +198,13 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
     // wäre eine Schleife und bleibt ausgeschlossen. Bei Codex ist der Stop-Weg gemessen der
     // einzige, der ankommt (Befund des Codex-PM zu #46).
     //
-    // Bei Antigravity feuert "prompt" vor jedem Modellaufruf und jeder Einspielung bleibt als
-    // sichtbare Nachricht im Gespräch. Der Schlüssel kommt dort deshalb nur zu Beginn eines
-    // Turns oder zusammen mit Post, wie bei den anderen Apps einmal je Prompt.
+    // Bei Antigravity läuft "prompt" vor jedem Modellaufruf. Der Schlüssel kommt dort nur
+    // zum Turn-Beginn oder zusammen mit dem Hinweis auf wartende Post.
+    const hasPost = response.messages.length > 0 || response.inboxNotice === true;
     const schluesselWeg =
       event === "session-start" ||
-      (event === "prompt" && (turnStart || response.messages.length > 0)) ||
-      (event === "stop" && response.messages.length > 0);
+      (event === "prompt" && (turnStart || hasPost)) ||
+      (event === "stop" && hasPost);
     if (schluesselWeg && inbox.needsSessionKey(session.id)) {
       response.sessionKey = inbox.sessionKey(session.id);
     }

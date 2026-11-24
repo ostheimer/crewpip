@@ -29,8 +29,8 @@ message and the overview on the board show which chats actually exchange message
 - **Hooks.** On session start, prompt (not in Cursor; in Antigravity before every model call), end
   of turn and session end (not in Antigravity) the app runs
   `apps/hook/crewpip-hook.mjs`. It registers the chat (`/hooks/<app>/<event>` in
-  `apps/daemon/src/http.ts`) and brings waiting messages into the chat. Only the hook delivers
-  messages on its own.
+  `apps/daemon/src/http.ts`) and brings waiting messages into the chat. For Antigravity the hook signals that mail is waiting.
+  The chat calls `read_inbox` or `wait_for_message` to fetch it and record delivery.
 
 ## Delivery paths
 
@@ -41,9 +41,9 @@ chat is defined in `formatOutput` (`apps/hook/crewpip-hook.mjs`).
 | Path | Claude Code | Codex | Cursor | Antigravity |
 |---|---|---|---|---|
 | Leave a message | `post_message` | `post_message` | `post_message` | `post_message` |
-| At session start | SessionStart hook | SessionStart hook | sessionStart hook | SessionStart hook |
-| At the next prompt | UserPromptSubmit hook | UserPromptSubmit hook | no, only at session start | PreInvocation hook before the model call, each message only once |
-| At the end of a turn | Stop hook, the chat continues with the message | Stop hook, the chat continues with the message | stop hook with `followup_message` | Stop hook with `continue`, the chat continues with the message |
+| At session start | SessionStart hook | SessionStart hook | sessionStart hook | Inbox notice at session start |
+| At the next prompt | UserPromptSubmit hook | UserPromptSubmit hook | no, only at session start | Inbox notice from PreInvocation |
+| At the end of a turn | Stop hook, the chat continues with the message | Stop hook, the chat continues with the message | stop hook with `followup_message` | Stop hook with `continue` prompts the chat to fetch its mail |
 | Fetch it yourself | `read_inbox` | `read_inbox` | `read_inbox` | `read_inbox` |
 | Wait actively | `wait_for_message`, up to 50 s per call | same | same | same |
 
@@ -121,8 +121,7 @@ picked up do not appear.
 - **Antigravity: one process, no session end.** All conversations of the Antigravity app run
   through one `language_server` process, and the hooks in `~/.gemini/config/hooks.json` apply to
   the app, IDE and CLI alike. Antigravity has no UserPromptSubmit: the PreInvocation hook fires
-  before every model call, also in the middle of a turn; delivery records make sure each message
-  arrives only once. Only a new human prompt lifts the loop guard, not the repeated model call
+  before every model call, also in the middle of a turn. Mail remains available if the chat misses the notice. Only a new human prompt lifts the loop guard, not the repeated model call
   after a continuation. A conversation never signs off and counts as connected while the app is
   running. If two conversations work in the same folder, the session key tells them apart.
 - **This Mac only.** Every computer has its own board. Chats on two computers cannot reach each

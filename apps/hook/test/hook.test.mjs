@@ -82,18 +82,23 @@ test("Antigravity (#20): Gespräch über conversationId, Projekt über workspace
   assert.equal(cwdOf("antigravity", { conversationId: "x" }, {}), null, "ohne Projekt keine Anmeldung, nie ~/.gemini/config");
 });
 
-test("Antigravity (#20): Ausgabe als injectSteps bzw. Stop mit continue", () => {
-  assert.equal(formatOutput("antigravity", "prompt", { messages: [] }), null);
-  const start = formatOutput("antigravity", "session-start", { messages: msgs });
-  assert.equal(start.injectSteps.length, 1);
-  assert.match(JSON.stringify(start.injectSteps[0]), /antworten an: session:x1/);
-  const pre = formatOutput("antigravity", "prompt", { messages: msgs, sessionKey: "k1" });
-  assert.match(JSON.stringify(pre.injectSteps), /Sitzungsschlüssel: k1/);
-  assert.equal(pre.terminationBehavior, undefined, "nie abbrechen");
-  const stop = formatOutput("antigravity", "stop", { messages: msgs });
-  assert.deepEqual(Object.keys(stop), ["decision", "reason"]);
+test("Antigravity meldet wartende Post mit festem Systemhinweis und eigenem Schlüssel", () => {
+  for (const event of ["session-start", "prompt"]) {
+    assert.equal(formatOutput("antigravity", event, { messages: [] }), null);
+    const result = formatOutput("antigravity", event, { inboxNotice: true, sessionKey: "k1", messages: msgs });
+    const text = result.injectSteps[0].systemMessage.systemMessage;
+    assert.match(text, /read_inbox/);
+    assert.match(text, /Sitzungsschlüssel: k1/);
+    assert.ok(!text.includes(msgs[0].text));
+    assert.equal(result.terminationBehavior, undefined);
+    const onlyKey = formatOutput("antigravity", event, { sessionKey: "k1" });
+    assert.match(onlyKey.injectSteps[0].systemMessage.systemMessage, /Sitzungsschlüssel: k1/);
+  }
+  const stop = formatOutput("antigravity", "stop", { inboxNotice: true, sessionKey: "k1" });
   assert.equal(stop.decision, "continue");
-  assert.equal(formatOutput("antigravity", "stop", { messages: [], sessionKey: "k" }), null, "leerer Stop setzt nicht fort");
+  assert.match(stop.reason, /read_inbox/);
+  assert.match(stop.reason, /Sitzungsschlüssel: k1/);
+  assert.equal(formatOutput("antigravity", "stop", { messages: [], sessionKey: "k" }), null);
 });
 
 test("Antigravity (#20): callDaemon meldet Turn-Beginn nur bei invocationNum 0, ohne Prompt-Text", async () => {
@@ -101,7 +106,7 @@ test("Antigravity (#20): callDaemon meldet Turn-Beginn nur bei invocationNum 0, 
   const fetchImpl = async (url, init) => { seen = { url, body: JSON.parse(init.body) }; return { ok: true, json: async () => ({ session: null, messages: [], mayContinue: true }) }; };
   const payload = { conversationId: "c1", workspacePaths: ["/p/x"], lastUserInput: "geheimer Prompt", invocationNum: 0 };
   await callDaemon({ app: "antigravity", event: "prompt", payload, env: {}, fetchImpl });
-  assert.equal(seen.url, "http://127.0.0.1:7357/hooks/antigravity/prompt");
+  assert.equal(seen.url, "http://127.0.0.1:7357/hooks/antigravity/notice/prompt");
   assert.equal(seen.body.sessionId, "c1");
   assert.equal(seen.body.cwd, "/p/x");
   assert.equal(seen.body.turnStart, true, "erster Modellaufruf nach Eingabe des Menschen");
