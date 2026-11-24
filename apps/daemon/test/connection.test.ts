@@ -62,3 +62,24 @@ test("Beendete Chats und MCP-Platzhalter ohne Hook", () => {
   const placeholder = inbox.resolveByCwd("codex", "/p/b");
   assert.equal(byId(inbox, placeholder.id).connection, "no-hook");
 });
+
+test("Das Archivsignal der Antigravity-App überstimmt den gemeinsamen lebenden Prozess, bis das Gespräch entarchiviert wird", () => {
+  const db = openDb(":memory:");
+  const archived = new Map<string, "archived" | "open">([["app-archiv", "archived"], ["app-offen", "open"], ["ide", "archived"], ["codex", "archived"]]);
+  const inbox = new Inbox(db, new Board(db), archived);
+  try {
+    for (const id of ["app-archiv", "app-offen", "ide", "codex"]) {
+      inbox.upsertSession({ id, app: id === "codex" ? "codex" : "antigravity", cwd: "/p/ag" });
+      inbox.setProcChain(id, [{ pid: ALIVE, comm: "language_server" }, { pid: ALIVE, comm: id === "ide" ? "Antigravity IDE" : "Antigravity" }]);
+    }
+    assert.equal(byId(inbox, "app-archiv").connection, "archived");
+    for (const id of ["app-offen", "ide", "codex"]) assert.equal(byId(inbox, id).connection, "connected");
+    archived.delete("app-archiv");
+    assert.equal(byId(inbox, "app-archiv").connection, "unconfirmed");
+    archived.set("app-archiv", "open");
+    assert.equal(byId(inbox, "app-archiv").connection, "connected");
+    archived.set("app-archiv", "archived");
+    inbox.endSession("app-archiv");
+    assert.equal(byId(inbox, "app-archiv").connection, "ended");
+  } finally { db.close(); }
+});

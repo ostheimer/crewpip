@@ -1,7 +1,7 @@
 # Wann ein Chat als verbunden gilt
 
 Das Dashboard zeigt unter „Chats an CrewPip“ je Repo jeden eingetragenen Chat mit einem von
-fünf Zuständen. Die Regel steht in `connectionOf` (`apps/daemon/src/inbox.ts`) und ist in
+sieben Zuständen. Die Regel steht in `connectionOf` (`apps/daemon/src/inbox.ts`) und ist in
 `apps/daemon/test/connection.test.ts` getestet. Das MCP-Werkzeug `list_sessions` nennt
 denselben Zustand als `verbindung=…`.
 
@@ -10,6 +10,8 @@ denselben Zustand als `verbindung=…`.
 | Post kommt an (`connected`) | nicht ausgetragen, der Hook hat sich mindestens einmal gemeldet, der Agent-Prozess läuft | Post kommt beim nächsten Turn an, auch wenn der Chat gerade ruht. |
 | Ohne Hook (`no-hook`) | eingetragen, aber nie über den Hook gemeldet (nur Claude-Registry oder nur MCP-Aufruf) | CrewPip kennt den Chat, aber ob Post von selbst ankommt, ist offen. Meldet sich der Hook auch nach dem nächsten Turn nicht, Chat neu starten oder Einrichtung prüfen. |
 | Neustart nötig (`restart-needed`) | Claude: der Prozess läuft, hat seit seinem Start mindestens einen Turn beendet (Registry `status` = `idle`, letzte Statusänderung mindestens 10 s nach dem Start und mindestens 10 s her), aber kein Hook kam aus diesem Prozess | Der Chat hat die CrewPip-Hooks nicht geladen. Nur ein Neustart des Chats hilft (siehe unten). |
+| Unbestätigt (`unconfirmed`) | Archivstatus der laufenden App nicht überprüfbar | Ein gemeinsamer Prozess allein belegt keine Zustellung an dieses Gespräch. |
+| Archiviert (`archived`) | der Suchindex der Antigravity-App kennzeichnet das Gespräch als archiviert | Post bleibt für den nächsten Kontakt liegen. |
 | Veraltet (`stale`) | der Agent-Prozess läuft nicht mehr, der Eintrag ist aber offen | Liegen gebliebener Eintrag. |
 | Beendet (`ended`) | ausgetragen (SessionEnd, Claude-Registry, Platzhalter abgelöst oder von Hand) | erscheint nicht in der Übersicht. |
 
@@ -47,10 +49,17 @@ ChatGPT-App läuft. Der letzte Kontakt steht deshalb an jedem Chat dabei.
 
 Antigravity (gemessen mit 2.33 am 20.11.2026): Der Hook läuft direkt unter dem
 `language_server` der App, Kette `language_server` → `Antigravity`. Alle Gespräche teilen diesen
-Prozess, und Antigravity kennt kein `SessionEnd`. Ein Gespräch gilt deshalb als verbunden,
-solange die App läuft, auch wenn es archiviert oder gelöscht ist; beendet die App, werden alle
-ihre Gespräche „veraltet“. Erledigte Gespräche lassen sich im Board von Hand austragen. Die
-Hooks in `~/.gemini/config/hooks.json` gelten laut Doku auch für Antigravity-IDE und -CLI;
+Prozess. Antigravity kennt kein `SessionEnd`. Seit App-Version 2.34 ist eine zusätzliche
+Quelle geprüft: `~/.gemini/antigravity/conversation_summaries.db` (Suchschema 3). CrewPip
+liest beim Start und alle 30 Sekunden den App-Eintrag (`app_data_dir = antigravity`), seinen
+Suchindex-Kopf (`chunk_index = -1`) und die kleine `annotations/<ID>.pbtxt` für registrierte
+App-Gespräche. Ein Archivkennzeichen in einer der beiden Quellen ergibt „Archiviert“.
+Widersprechen die Quellen einander, gilt zunächst der Archivnachweis. Sind die Daten
+unlesbar, fehlt der App-Eintrag oder ist das Indexschema unbekannt, bleibt ein bereits
+bestätigtes Archiv im laufenden Dienst erhalten. Sonst erscheint ein lebender App-Prozess
+mit ungeklärtem Gesprächszustand als „Unbestätigt“. Wieder lesbare Metadaten können die
+reguläre Prozessanzeige herstellen. Ein fehlender Eintrag allein belegt kein Löschen. Archivierung ändert weder Zustellung
+noch Rollen. Die Hooks in `~/.gemini/config/hooks.json` gelten laut Doku auch für Antigravity-IDE und -CLI;
 geprüft ist bisher nur die App.
 
 Das Dashboard holt die Sitzungen zusätzlich alle 30 Sekunden neu, weil das Ende eines

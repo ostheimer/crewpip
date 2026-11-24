@@ -27,7 +27,9 @@ const DEAD = 2147483646;
 before(async () => {
   const db = openDb(":memory:");
   const board = new Board(db);
-  const inbox = new Inbox(db, board);
+  const inbox = new Inbox(db, board, new Map([["ag-archiv", "archived"]]));
+  inbox.upsertSession({ id: "ag-archiv", app: "antigravity", cwd: "/nirgends/demo-archiv", name: "Archivprobe" });
+  inbox.setProcChain("ag-archiv", [{ pid: ALIVE, comm: "language_server" }, { pid: ALIVE, comm: "Antigravity" }]);
   const runner = new Runner(db, board, { logDir: tmpdir() });
   runner.available = () => [];
 
@@ -89,5 +91,19 @@ test("Übersicht zeigt je Repo verbundene und nur eingetragene Chats", async () 
     await en.waitFor();
     assert.match(await en.locator('[data-repo="demo-beta"] .repo-count').getAttribute("aria-label") ?? "", /0 of 1 chat connected to CrewPip/);
     assert.match(await en.locator('[data-repo="demo-alpha"]').innerText(), /Without hook/);
+  } finally { await page.close(); }
+});
+
+test("Die Matrix zeigt den archivierten Antigravity-Chat bei lebendem Prozess mit eigenem Status", async () => {
+  const page = await browser.newPage({ locale: "de-AT" });
+  try {
+    await page.goto(url);
+    const row = page.locator('[data-repo="demo-archiv"]');
+    await row.locator(".repo-toggle").click();
+    assert.match(await row.locator(".repo-count").getAttribute("aria-label") ?? "", /0 von 1 Chat/);
+    assert.equal(await row.locator('button.dot-archived').getAttribute("data-chat"), "ag-archiv");
+    assert.match(await row.locator(".conn-chat-list").innerText(), /Archivprobe[\s\S]*Archiviert/);
+    await page.getByLabel("Sprache", { exact: true }).selectOption("en");
+    assert.match(await row.locator(".conn-chat-list").innerText(), /Archived/);
   } finally { await page.close(); }
 });

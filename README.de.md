@@ -291,8 +291,7 @@ Unterschiede zu den anderen Apps (geprüft mit Antigravity 2.33 am 20.11.2026):
 - **Identität:** Das Gespräch heißt `conversationId`, das Projekt kommt aus `cwd`
   (bzw. `workspacePaths`). Alle Gespräche laufen über den `language_server` der App; arbeiten
   zwei im selben Ordner, trennt sie der Sitzungsschlüssel wie bei Codex.
-- **Kein Sitzungsende.** Antigravity hat kein `SessionEnd`. Ein Gespräch bleibt als verbunden
-  stehen, solange die App läuft (siehe `docs/verbindung.md`).
+- **Kein Sitzungsende.** Antigravity hat kein `SessionEnd`. CrewPip erkennt im lokalen Index der App als archiviert gekennzeichnete Gespräche. Für die übrigen gilt die [Verbindungsregel](docs/verbindung.md).
 
 **Mehrere Sessions im selben Ordner:** Der Daemon unterscheidet sie über die Session-ID aus
 dem Hook und bei MCP-Aufrufen über den Prozess (siehe oben). Früher entschied beim MCP-Aufruf
@@ -547,8 +546,7 @@ Praktisch heißt das:
 
 ## Noch offen
 
-- Antigravity: Gespräche tragen sich nicht selbst aus (kein `SessionEnd`); erledigte
-  Gespräche bleiben bis zum Ende der App sichtbar oder werden im Board von Hand ausgetragen.
+- Antigravity meldet kein Löschen. Im Betrieb ist noch zu prüfen, wie ein lokal gelöschtes Gespräch zuverlässig erkannt werden kann (#29).
 - Cursor ist auf diesem Mac nicht installiert; die Cursor-Pfade sind nur gegen die Doku
   geprüft, nicht im Betrieb.
 - Codex `turn/steer` über den App-Server für Threads, die CrewPip selbst startet (Variante B).
