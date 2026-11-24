@@ -179,9 +179,11 @@ export function createMcpServer(
       description: "Liest Nachrichten, die deine Session noch nicht gesehen hat, und verbucht sie als zugestellt.",
       inputSchema: { cwd: cwdParam, session_key: keyParam },
     },
-    guarded(async ({ cwd, session_key }) => ({
-      content: [{ type: "text", text: renderMessages(inbox.take((await me(cwd, session_key)).id, "mcp-read")) }],
-    })),
+    guarded(async ({ cwd, session_key }, extra) => {
+      const self = await me(cwd, session_key);
+      extra.signal.throwIfAborted();
+      return { content: [{ type: "text", text: renderMessages(inbox.take(self.id, "mcp-read")) }] };
+    }),
   );
 
   server.registerTool(
@@ -195,7 +197,9 @@ export function createMcpServer(
     },
     guarded(async ({ cwd, session_key, timeout_seconds }, extra) => {
       const secs = Math.min(timeout_seconds ?? config.defaultWaitSeconds, config.maxWaitSeconds);
-      const msgs = await inbox.waitFor((await me(cwd, session_key)).id, secs * 1000, extra.signal);
+      const self = await me(cwd, session_key);
+      extra.signal.throwIfAborted();
+      const msgs = await inbox.waitFor(self.id, secs * 1000, extra.signal);
       return { content: [{ type: "text", text: msgs.length ? renderMessages(msgs) : `Nichts Neues nach ${secs} s.` }] };
     }),
   );
