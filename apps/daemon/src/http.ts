@@ -136,7 +136,15 @@ export function createDaemon(inbox: Inbox, board: Board, runner: Runner, opts: {
     // Antigravity meldet "prompt" vor jedem Modellaufruf (PreInvocation); nur der erste nach einer
     // Eingabe des Menschen ist ein neuer Turn.
     const turnStart = body.turnStart !== false;
-    if (event === "session-start" || (event === "prompt" && turnStart)) inbox.resetStopContinuations(session.id);
+    const startsTurn = event === "session-start" || (event === "prompt" && turnStart);
+    if (kind === "antigravity" && req.params.app && event !== "session-end") {
+      // Ein alter Hook versteht inboxNotice nicht. Seine Anmeldung darf den ersten Hinweis
+      // für den aktualisierten Hook im selben Turn nicht verbrauchen.
+      if (startsTurn && inbox.needsSessionKey(session.id)) response.sessionKey = inbox.sessionKey(session.id);
+      res.json(response);
+      return;
+    }
+    if (startsTurn) inbox.resetStopContinuations(session.id);
     if (kind === "antigravity" && event !== "session-end") {
       // Vor der Abholung können Hooks verloren gehen. Nur die erste offene ID dient zur
       // Entprellung des Hinweises; ein Neustart darf wieder erinnern.

@@ -46,7 +46,7 @@ function get(url: string, init: RequestInit = {}): Promise<Response> {
   return globalThis.fetch(url, { ...init, headers });
 }
 async function hook(event: string, body: Record<string, unknown>) {
-  const res = await get(`${base}/hooks/antigravity/${event}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ app: "antigravity", ...body }) });
+  const res = await get(`${base}/hooks/antigravity/notice/${event}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ app: "antigravity", ...body }) });
   assert.equal(res.status, 200);
   return (await res.json()) as HookResponse;
 }
@@ -74,16 +74,26 @@ test("Antigravity-Hooks lassen Post bis zur einmaligen Übernahme über MCP im P
   const cwd = "/p/abholung";
   const sessionId = "ag-abholung";
   const payload = { sessionId, cwd };
-  await hook("session-start", payload);
+  const register = await get(`${base}/hooks/antigravity/session-start`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+  assert.equal(register.status, 200);
   await postHuman(`session:${sessionId}`, "Prüfwort 36");
   const deliveries = async () => {
     const messages = await (await get(`${base}/api/messages`)).json() as Message[];
     return messages.find(m => m.text === "Prüfwort 36")!.deliveries.map(d => d.method);
   };
+  const req = { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...payload, turnStart: false }) };
+  // Beide Versionsrichtungen beim Update: Auf dem Ausgangsstand quittiert schon der alte
+  // Hook. Er darf auf dem neuen Daemon auch den Hinweis an den aktualisierten Hook nicht verbrauchen.
+  const legacy = await get(`${base}/hooks/antigravity/prompt`, req);
+  const legacyResponse = await legacy.json() as HookResponse;
+  assert.deepEqual(legacyResponse.messages, []);
+  assert.ok(!legacyResponse.inboxNotice);
+  assert.deepEqual(await deliveries(), []);
+  const first = await hook("prompt", { ...payload, turnStart: false });
+  assert.equal(first.inboxNotice, true, "erster neuer Hook im selben Turn erhält den Hinweis");
   const start = await hook("session-start", payload);
   assert.deepEqual(start.messages, [], "Start-Hook erhält keine Nachrichteninhalte");
   assert.equal(start.inboxNotice, true);
-  const req = { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) };
   const denied = await fetch(`${base}/hooks/antigravity/notice/prompt`, req);
   assert.equal(denied.status, 401, "der Hinweis-Endpunkt verlangt wie bisher das lokale Token");
   const prompt = await hook("prompt", { ...payload, turnStart: true });
