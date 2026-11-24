@@ -45,7 +45,7 @@ export const ROLE_LABELS: Record<SessionRole, string> = {
  */
 export function roleFromName(name: string): SessionRole | null {
   const n = name.trim();
-  if (/^director\b/i.test(n)) return "director";
+  if (/^director$/i.test(n)) return "director";
   if (/^pm\b/i.test(n)) return "pm";
   if (/^worker\b/i.test(n)) return "worker";
   return null;

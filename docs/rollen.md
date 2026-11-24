@@ -17,7 +17,8 @@ Person, App, Modellwahl oder Organisation gebunden.
 Director. CrewPip leitet die Rolle aus dem wirksamen Anzeigenamen ab („PM …“, „Director“,
 „Worker …“), gleich woher der Name stammt: `/rename` in Claude Code, Titel in Codex oder Claude
 Desktop, Name vom Hook (Antigravity). Ausgewertet wird bei der Anmeldung und bei jeder
-Namensänderung.
+Namensänderung. Für den Director muss der vollständige Titel `Director` lauten. Groß- und
+Kleinschreibung sowie Leerzeichen am Anfang und Ende spielen dabei keine Rolle.
 
 **Konflikte werden nicht still aufgelöst.** Heißt ein zweiter laufender Chat wie der PM oder
 Director, behält der bisherige Inhaber die Rolle. Die Übersicht zeigt in der Projektzeile
