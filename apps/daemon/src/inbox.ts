@@ -25,6 +25,7 @@ import {
   parseTarget,
   sessionLabel,
 } from "@crewpip/shared";
+import type { ArchiveState } from "./registry/antigravity.js";
 import type { RegistryEntry } from "./registry/claude.js";
 import type { Proc } from "./peer.js";
 import type { Board } from "./board.js";
@@ -244,6 +245,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
   constructor(
     private readonly db: DatabaseSync,
     private readonly board: Board,
+    private readonly antigravityArchives?: ReadonlyMap<string, ArchiveState>,
   ) {
     super();
   }
@@ -255,6 +257,11 @@ export class Inbox extends EventEmitter<InboxEvents> {
   }
 
   private toSession(r: SessionRow): Session {
+    let connection = connectionOf(r, undefined, this.activityWithoutHook(r.id));
+    if (!r.ended_at && this.antigravityArchives && r.app === "antigravity" && chainOf(r).some(p => p.comm === "Antigravity")) {
+      const state = this.antigravityArchives.get(r.id) ?? "unconfirmed";
+      if (state === "archived" || (state === "unconfirmed" && connection === "connected")) connection = state;
+    }
     return {
       id: r.id,
       app: r.app,
@@ -264,7 +271,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
       cwd: r.cwd,
       ...this.board.sessionDisplay(r),
       status: r.ended_at ? "ended" : r.status,
-      connection: connectionOf(r, undefined, this.activityWithoutHook(r.id)),
+      connection,
       startedAt: r.started_at,
       lastSeenAt: r.last_seen_at,
       endedAt: r.ended_at,

@@ -7,6 +7,7 @@ import { Inbox } from "./inbox.js";
 import { Board } from "./board.js";
 import { Runner } from "./runner/index.js";
 import { createDaemon } from "./http.js";
+import { refreshAntigravityArchives, type ArchiveState } from "./registry/antigravity.js";
 import { NativeNames } from "./registry/native-names.js";
 import type { AppKind } from "@crewpip/shared";
 import { ClaudeRegistryWatcher, registryDir } from "./registry/claude.js";
@@ -18,7 +19,8 @@ const webDist = path.resolve(here, "../../web/dist");
 const db = openDb(config.dbPath, { log: (l) => console.log(l) });
 const names = new NativeNames();
 const board = new Board(db, names);
-const inbox = new Inbox(db, board);
+const archivedAntigravity = new Map<string, ArchiveState>();
+const inbox = new Inbox(db, board, archivedAntigravity);
 const runner = new Runner(db, board, {
   logDir: path.join(path.dirname(config.dbPath), "runs"),
   log: (l) => console.log(l),
@@ -38,7 +40,8 @@ async function refreshNames() {
   if (refreshing) return;
   refreshing = true;
   try {
-    const known = db.prepare("SELECT id, app FROM sessions WHERE app IN ('codex', 'claude')").all() as unknown as { id: string; app: AppKind }[];
+    const known = db.prepare("SELECT id, app FROM sessions WHERE app IN ('codex', 'claude', 'antigravity')").all() as unknown as { id: string; app: AppKind }[];
+    if (await refreshAntigravityArchives(archivedAntigravity, known.filter(s => s.app === "antigravity").map(s => s.id))) inbox.emit("sessions");
     if (await names.refresh(known)) {
       board.confirmLegacyClaudeTitles();
       board.emit("projects");

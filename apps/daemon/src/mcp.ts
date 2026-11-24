@@ -50,7 +50,7 @@ export function renderMessages(msgs: Message[]): string {
     .join("\n\n---\n\n");
 }
 
-const CONNECTION_WORDS: Record<Session["connection"], string> = { connected: "verbunden", "no-hook": "ohne-hook", "restart-needed": "neustart-noetig", stale: "veraltet", ended: "beendet" };
+const CONNECTION_WORDS: Record<Session["connection"], string> = { connected: "verbunden", "no-hook": "ohne-hook", "restart-needed": "neustart-noetig", stale: "veraltet", archived: "archiviert", unconfirmed: "unbestaetigt", ended: "beendet" };
 
 function renderSessions(all: Session[], self: Session | null): string {
   const byProject = new Map<string, Session[]>();
