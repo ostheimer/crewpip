@@ -12,6 +12,8 @@ import { readToken } from "./auth.js";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "../../..");
 const hook = path.join(repoRoot, "apps/hook/crewpip-hook.mjs");
+const headersHelper = path.join(repoRoot, "apps/hook/crewpip-mcp-headers.mjs");
+const codexHeaderCommand = "node '" + headersHelper.replaceAll("'", "'\\''") + "'";
 const url = baseUrl();
 const token = readToken() ?? "<Token aus ~/.crewpip/token>";
 
@@ -65,15 +67,13 @@ export const snippets = {
     ),
   },
   codexMcp: {
-    file: "~/.codex/config.toml (anhängen), alternativ: codex mcp add crewpip --url " + `${url}/mcp/codex?app=codex`,
+    file: "~/.codex/config.toml (CrewPip-Abschnitt einfügen oder aktualisieren)",
     content: [
       "[mcp_servers.crewpip]",
       `url = "${url}/mcp/codex?app=codex"`,
       "startup_timeout_sec = 10",
       "tool_timeout_sec = 60",
-      "",
-      "[mcp_servers.crewpip.http_headers]",
-      `x-crewpip-token = "${token}"`,
+      `http_headers_helper = ${JSON.stringify(codexHeaderCommand)}`,
       "",
     ].join("\n"),
   },

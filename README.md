@@ -25,16 +25,16 @@ The migration updates existing global Claude Code and Codex MCP and hook entries
 
 ## Connect your first chat
 
-Run `pnpm snippets --write` in the CrewPip directory. It generates configuration files for this Mac in `config/generated/`. Merge the entries for your app into its existing settings, keeping any other servers and hooks. The generated MCP files contain your local access token.
+Run `pnpm snippets --write` in the CrewPip directory. It generates configuration files for this Mac in `config/generated/`. Merge the entries for your app into its existing settings, keeping any other servers and hooks. The Codex snippet references a helper that reads the existing CrewPip token on connection. The snippets for the other clients contain your local access token.
 
 | App | MCP connection | Hooks |
 |---|---|---|
 | Claude Code | Merge `claudeMcp.json` into `~/.claude.json` or your project's `.mcp.json`. | Merge `claudeHooks.json` into `~/.claude/settings.json`. |
 | Cursor | Merge `cursorMcp.json` into `~/.cursor/mcp.json`. | Merge `cursorHooks.json` into `~/.cursor/hooks.json`. |
-| Codex | Merge both sections from `codexMcp.toml` into `~/.codex/config.toml`. | Merge `codexHooks.json` into `~/.codex/hooks.json`. In Codex, review and approve the four CrewPip hooks. You can also open the review with `/hooks`. |
+| Codex | Merge the server section from `codexMcp.toml` into `~/.codex/config.toml`. When upgrading, remove the previous static `x-crewpip-token` entry for CrewPip. | Merge `codexHooks.json` into `~/.codex/hooks.json`. In Codex, review and approve the four CrewPip hooks. You can also open the review with `/hooks`. |
 | Antigravity | Merge `antigravityMcp.json` into `mcpServers` in `~/.gemini/config/mcp_config.json`. | Add the `crewpip` entry from `antigravityHooks.json` to `~/.gemini/config/hooks.json`. Applies to the app, IDE, and CLI. Antigravity has no UserPromptSubmit and no SessionEnd: session start, `PreInvocation`, and `Stop` can prompt the chat to check its inbox. CrewPip records delivery when `read_inbox` or `wait_for_message` returns the message. |
 
-Start a new chat in the app you connected and ask it to “List my CrewPip chats using the `list_sessions` MCP tool.” An asterisk marks the current chat. If the list is empty or the asterisk is missing, check the hook settings and, for Codex, the hook approval. If the MCP connection returns HTTP 401, check that the generated `x-crewpip-token` header was included.
+Start a new chat in the app you connected and ask it to “List my CrewPip chats using the `list_sessions` MCP tool.” An asterisk marks the current chat. If the list is empty or the asterisk is missing, check the hook settings and, for Codex, the hook approval. If Codex returns HTTP 401, check the helper path and the token file at `~/.crewpip/token` or `CREWPIP_TOKEN_FILE`. For the other clients, check the configured `x-crewpip-token` header.
 
 ## Deliver your first message
 
