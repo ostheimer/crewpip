@@ -136,7 +136,7 @@ test("Rollen: aus dem Namen abgeleitet, je Projekt nur ein PM, insgesamt ein Dir
   const pm1 = inbox.upsertSession({ id: "pm1", app: "claude", cwd: "/p/outbig", name: "PM outbig" });
   assert.equal(pm1.role, "pm");
   // Seit #28: Ein zweiter PM-Name im selben Projekt hängt nicht still um, sondern zeigt einen Konflikt.
-  inbox.upsertSession({ id: "pm2", app: "claude", cwd: "/p/outbig", name: "PM outbig neu" });
+  inbox.upsertSession({ id: "pm2", app: "claude", cwd: "/p/outbig", name: "PM outbig (neu)" });
   assert.equal(inbox.sessions().find((s) => s.id === "pm1")!.role, "pm");
   assert.equal(inbox.sessions().find((s) => s.id === "pm2")!.role, null);
   assert.equal(inbox.sessions().find((s) => s.id === "pm2")!.roleConflict?.holderId, "pm1");
