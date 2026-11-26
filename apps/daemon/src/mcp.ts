@@ -79,7 +79,7 @@ function renderSessions(all: Session[], self: Session | null): string {
     "pm:<projekt> und director folgen der Rolle, nicht der Sitzung: Sie erreichen auch den,",
     "der die Rolle erst später übernimmt, und überstehen einen Neustart.",
     "verbindung=ohne-hook, neustart-noetig oder veraltet: Post erreicht diesen Chat nicht von selbst (docs/verbindung.md).",
-    "Konflikt: CrewPip hängt PM oder Director nie still um. Umhängen mit set_role (Inhaber, Director oder PM crewpip) oder im Dashboard.",
+    "Konflikt: CrewPip hängt PM oder Director nur beim Claude-Vorrang selbst um (genau ein Claude-Anwärter, docs/rollen.md). Sonst umhängen mit set_role (Inhaber, Director oder PM crewpip) oder im Dashboard.",
   );
   return lines.join("\n");
 }

@@ -111,8 +111,9 @@ test("#28/1 Antigravity: Name vom Hook vergibt die Rolle bei Anmeldung", () => {
 // ---- Kriterium 2: genau ein PM/Director; Konflikte sichtbar statt still umgehängt ---------
 
 test("#28/2 Zweiter Namensanspruch hängt nicht still um: Inhaber behält, Konflikt wird genannt", () => {
+  // Nur Nicht-Claude-Chats: mit einem Claude-Chat entscheidet der Claude-Vorrang (#48).
   const { inbox, titles } = setup();
-  inbox.upsertSession({ id: "cl", app: "claude", cwd: "/p/mailaura", name: "PM mailaura" });
+  inbox.upsertSession({ id: "cl", app: "antigravity", cwd: "/p/mailaura", name: "PM mailaura" });
   assert.equal(role(inbox, "cl"), "pm");
   inbox.upsertSession({ id: "cx", app: "codex", cwd: "/p/mailaura" });
   titles.set("codex:cx", "PM mailaura");
@@ -126,7 +127,7 @@ test("#28/2 Zweiter Namensanspruch hängt nicht still um: Inhaber behält, Konfl
   assert.equal(role(inbox, "cl"), "pm");
   assert.equal(role(inbox, "ag"), null);
   // Director genauso
-  inbox.upsertSession({ id: "d1", app: "claude", cwd: "/p/zentrale", name: "Director" });
+  inbox.upsertSession({ id: "d1", app: "antigravity", cwd: "/p/zentrale", name: "Director" });
   inbox.upsertSession({ id: "d2", app: "codex", cwd: "/p/zentrale", name: "Director" });
   assert.equal(role(inbox, "d1"), "director");
   assert.equal(role(inbox, "d2"), null);
@@ -263,8 +264,14 @@ test("#28/3+4 set_role: nur Inhaber, Director oder PM crewpip; protokolliert; wa
   assert.equal(blocked.isError, true);
   assert.match(blocked.text, /Claude-Vorrang/);
   assert.equal(role(inbox, "cl-pm"), "pm");
+  // Neben dem Claude-Inhaber zeigt der Codex-Anwärter keinen Konflikt (#48), zwischen zwei
+  // Nicht-Claude-Chats schon.
+  inbox.upsertSession({ id: "pm-other-2", app: "codex", cwd: "/p/other/.claude/worktrees/y" });
+  titles.set("codex:pm-other-2", "PM other");
+  inbox.syncNameRoles?.();
   const listed = await d.call("antigravity", "/p/anderes", "list_sessions", {});
-  assert.match(listed.text, /Konflikt/);
+  assert.match(listed.text, /Konflikt: beansprucht PM per Namen, die Rolle hat Codex · PM other/);
+  assert.doesNotMatch(listed.text, /Konflikt: beansprucht PM per Namen, die Rolle hat Claude/);
   assert.match(listed.text, /PM claribill.*\[PM\]/);
 });
 

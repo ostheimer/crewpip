@@ -211,7 +211,7 @@ export const en = {
   roleConflictText: (name: string, app: string, role: string, holder: string | null) => holder
     ? `${name} (${app}) is named like a ${role}, but ${holder} holds the role.`
     : `${name} (${app}) claims ${role} by name, and so does another chat; the role is therefore not assigned.`,
-  roleConflictHowTo: "CrewPip never reassigns roles silently. Change it under “Manage chats and roles” or with set_role (current PM, director, or PM crewpip); renaming also resolves the conflict.",
+  roleConflictHowTo: "CrewPip only reassigns roles itself under the Claude priority (exactly one Claude claimant). Change it under “Manage chats and roles” or with set_role (current PM, director, or PM crewpip); renaming also resolves the conflict.",
   roleFor: (name: string) => `Role for ${name}`,
   forgetChat: (name: string) => `Unregister ${name} from the board? The chat itself will be kept.`,
   taskCreated: (name: string) => `Task created in ${name}. No agent was started.`,
