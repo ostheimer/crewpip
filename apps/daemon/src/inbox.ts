@@ -198,6 +198,8 @@ const SESSION_TARGETS = `(m.to_target = ? OR m.to_target IN (?, ?)
   OR (m.to_target IN (?, 'all') AND m.created_at >= ?)
   OR (? = 'pm' AND m.to_target IN (?, ?))
   OR (? = 'director' AND m.to_target = 'director'))`;
+/** Rollenadressen haben genau einen Empfänger; ihre Post wird einmal zugestellt, nicht je Session. */
+const ROLE_TARGET = `(m.to_target = 'director' OR m.to_target LIKE 'pm:%')`;
 function targetParams(s: SessionRow, board: Board): string[] {
   const id = s.project_id ?? s.project;
   const alias = board.projectAddressId(s.project) === id ? s.project : id;
@@ -699,7 +701,9 @@ export class Inbox extends EventEmitter<InboxEvents> {
       }[]
     ).map((d) => ({ sessionId: d.session_id, sessionLabel: this.board.sessionDisplay({ ...d, id: d.session_id }).label, method: d.method, at: d.at }));
     const delivered = new Set(deliveries.map((d) => d.sessionId));
-    const pending = this.targetSessions(r).filter((s) => !delivered.has(s.id)).map((s) => this.board.sessionDisplay(s).label);
+    // Rollen-Post ist mit der ersten Zustellung erledigt, auch wenn die Rolle inzwischen woanders liegt (#44).
+    const roleDone = (to.kind === "pm" || to.kind === "director") && deliveries.length > 0;
+    const pending = roleDone ? [] : this.targetSessions(r).filter((s) => !delivered.has(s.id)).map((s) => this.board.sessionDisplay(s).label);
     return {
       id: r.id,
       from,
@@ -769,14 +773,18 @@ export class Inbox extends EventEmitter<InboxEvents> {
     return msg;
   }
 
-  /** Nachrichten, die eine Session noch nicht gesehen hat. */
+  /**
+   * Nachrichten, die eine Session noch nicht gesehen hat. Post an eine Rolle (`pm:`, `director`)
+   * gilt mit der ersten Zustellung an irgendeinen Inhaber als erledigt (#44); sonst bekäme jeder
+   * neue Inhaber, auch derselbe Chat nach einem Neustart, den ganzen Verlauf noch einmal.
+   */
   pendingFor(sessionId: string, limit = 50): Message[] {
     const s = this.sessionRow(sessionId);
     if (!s || s.ended_at) return [];
     const rows = this.db
       .prepare(
         `SELECT m.* FROM messages m
-         WHERE NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.message_id = m.id AND d.session_id = ?)
+         WHERE NOT EXISTS (SELECT 1 FROM deliveries d WHERE d.message_id = m.id AND (d.session_id = ? OR ${ROLE_TARGET}))
            AND NOT (m.from_kind = 'session' AND m.from_id = ?)
            AND ${SESSION_TARGETS}
          ORDER BY m.id ASC LIMIT ?`,
