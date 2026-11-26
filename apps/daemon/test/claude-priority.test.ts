@@ -154,12 +154,33 @@ test("#51 Regression: Claude-Director mit „PM <projekt>“ blockiert set_role 
   assert.equal(role(inbox, "cx"), "pm");
   // Zwei Chats beanspruchen PM, die Automatik entscheidet nicht: Der Konflikt bleibt sichtbar …
   assert.equal(conflict(inbox, "d")?.holderId, "cx");
-  // … und lässt sich per set_role lösen.
+  // … und set_role auf einen anderen PM wird nicht mehr mit „bekommt sie automatisch“ abgelehnt.
   inbox.setRole("neu", "pm", "dashboard");
   assert.equal(role(inbox, "neu"), "pm");
   assert.equal(role(inbox, "cx"), null);
   assert.equal(role(inbox, "d"), "director");
   assert.ok(!inbox.roleChanges().some((c) => c.actor === AUTO));
+  // Der Namensanspruch des Directors bleibt ein sichtbarer Konflikt, bis er umbenannt wird.
+  assert.equal(conflict(inbox, "d")?.holderId, "neu");
+  inbox.renameSession("d", "Director");
+  assert.equal(conflict(inbox, "d"), null);
+});
+
+test("#51 set_role zwischen PM und Director bewertet den Claude-Vorrang nach dem Wechsel", () => {
+  const { inbox } = setup();
+  // PM → Director: Als Director bekäme p PM nie automatisch zurück; der Wechsel ist erlaubt.
+  inbox.upsertSession({ id: "p", app: "claude", cwd: "/p/firma", name: "PM firma" });
+  inbox.upsertSession({ id: "cx", app: "codex", cwd: "/p/firma", name: "PM firma" });
+  assert.equal(role(inbox, "p"), "pm");
+  inbox.setRole("p", "director", "dashboard");
+  assert.equal(role(inbox, "p"), "director");
+  // Director → PM: d hält PM nach dem Wechsel selbst und gibt Director frei, obwohl dx ihn beansprucht.
+  const b = setup().inbox;
+  b.upsertSession({ id: "d", app: "claude", cwd: "/p/firma", name: "Director" });
+  b.upsertSession({ id: "dx", app: "codex", cwd: "/p/zentrale", name: "Director" });
+  assert.equal(role(b, "d"), "director");
+  b.setRole("d", "pm", "dashboard");
+  assert.equal(role(b, "d"), "pm");
 });
 
 test("#51 Regression: Claude-Director mit „PM <projekt>“ neben einem Claude-PM zeigt keinen Dauerkonflikt", () => {
