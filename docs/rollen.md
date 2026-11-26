@@ -33,7 +33,8 @@ Director ist, tauscht seine Rolle nicht automatisch. Jeder solche Wechsel steht 
 `role_changes` mit dem Akteur `automatisch: Claude-Vorrang`. Der Vorrang gilt immer, damit ein
 Neustart die Rolle nicht wieder an einen anderen Chat gibt: `set_role` und Dashboard lehnen
 einen Wechsel ab, der ihm widerspricht, und nennen den Claude-Chat. Soll ein anderer Chat die
-Rolle bekommen, wird zuerst der Claude-Chat umbenannt.
+Rolle bekommen, wird zuerst der Claude-Chat umbenannt. Hat der Claude-Vorrang entschieden, zeigen
+Dashboard und `list_sessions` beim unterlegenen Chat keinen Konflikt.
 
 **Sonst werden Konflikte nicht still aufgelöst.** Heißt ein zweiter laufender Chat wie der PM
 oder Director, behält der bisherige Inhaber die Rolle. Das gilt auch bei zwei oder mehr

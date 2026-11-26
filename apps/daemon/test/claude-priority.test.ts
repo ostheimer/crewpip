@@ -29,8 +29,9 @@ test("#48 Regression: Codex hält PM, ein Claude-Chat mit „PM <projekt>“ kom
   assert.equal(role(inbox, "cl"), "pm");
   assert.equal(role(inbox, "cx"), null);
   assert.equal(conflict(inbox, "cl"), null);
-  // Der Codex-Chat beansprucht weiter per Namen, sieht aber den Claude-Chat als Inhaber.
-  assert.equal(conflict(inbox, "cx")?.holderId, "cl");
+  // Der Codex-Chat beansprucht weiter per Namen; der Claude-Vorrang hat entschieden, also
+  // zeigen Dashboard und list_sessions keinen Konflikt mehr.
+  assert.equal(conflict(inbox, "cx"), null);
   const change = inbox.roleChanges().find((c) => c.toSession === "cl" && c.role === "pm");
   assert.equal(change?.fromSession, "cx");
   assert.equal(change?.actor, AUTO);
@@ -70,6 +71,7 @@ test("#48 Beanspruchen Claude und Codex gleichzeitig eine freie Rolle, bekommt s
   inbox.syncNameRoles();
   assert.equal(role(inbox, "cl"), "pm");
   assert.equal(role(inbox, "cx"), null);
+  assert.equal(conflict(inbox, "cx"), null);
 });
 
 test("#48 Zwei Claude-Anwärter: CrewPip ändert nichts, der Konflikt bleibt sichtbar", () => {

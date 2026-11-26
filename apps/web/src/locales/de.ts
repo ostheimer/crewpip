@@ -286,7 +286,7 @@ export const de = {
   roleConflictText: (name: string, app: string, role: string, holder: string | null) => holder
     ? `${name} (${app}) heißt wie ein ${role}, die Rolle hat aber ${holder}.`
     : `${name} (${app}) beansprucht ${role} per Namen, ein weiterer Chat ebenfalls; deshalb ist die Rolle nicht vergeben.`,
-  roleConflictHowTo: "CrewPip hängt Rollen nie still um. Wechsel unter „Chats und Rollen verwalten“ oder per set_role (aktueller PM, Director oder PM crewpip); umbenennen löst den Konflikt ebenfalls.",
+  roleConflictHowTo: "CrewPip hängt Rollen nur beim Claude-Vorrang selbst um (genau ein Claude-Anwärter). Wechsel unter „Chats und Rollen verwalten“ oder per set_role (aktueller PM, Director oder PM crewpip); umbenennen löst den Konflikt ebenfalls.",
   roleFor: (name: string) => `Rolle für ${name}`,
   forgetChat: (name: string) => `${name} aus dem Board austragen? Der Chat selbst bleibt erhalten.`,
   taskCreated: (name: string) => `Aufgabe in ${name} angelegt. Es wurde kein Agent gestartet.`,

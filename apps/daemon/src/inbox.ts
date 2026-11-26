@@ -513,7 +513,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
    * Name seit der letzten Auswertung geändert hat (oder force), damit eine im Dashboard
    * abgegebene Rolle nicht beim nächsten Abgleich zurückkommt.
    *
-   * PM und Director werden nie still umgehängt: Hält ein anderer lebender Chat die Rolle, oder
+   * PM und Director werden hier nie still umgehängt (das tut nur preferClaude, #48): Hält ein anderer lebender Chat die Rolle, oder
    * beansprucht ein weiterer sie ebenfalls per Namen, bleibt alles, wie es ist. Den Konflikt
    * zeigen Dashboard und list_sessions (roleConflictOf); gelöst wird er mit setRole.
    */
@@ -617,7 +617,12 @@ export class Inbox extends EventEmitter<InboxEvents> {
     if ((claimed !== "pm" && claimed !== "director") || r.role === claimed) return null;
     const others = this.liveInScope(claimed, r.project_id).filter((o) => o.id !== r.id);
     const holder = others.find((o) => o.role === claimed);
-    if (holder) return { role: claimed, holderId: holder.id, holderLabel: this.board.sessionDisplay(holder).label };
+    // Hält der einzige laufende Claude-Anwärter die Rolle, hat der Claude-Vorrang entschieden (#48).
+    if (holder) {
+      const claude = this.claudeClaimants(claimed, [r, ...others], holder.id);
+      if (claude.length === 1 && claude[0]!.id === holder.id) return null;
+      return { role: claimed, holderId: holder.id, holderLabel: this.board.sessionDisplay(holder).label };
+    }
     if (others.some((o) => roleFromName(this.effectiveName(o)) === claimed)) return { role: claimed, holderId: null, holderLabel: null };
     return null;
   }
