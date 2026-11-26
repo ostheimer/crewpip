@@ -554,10 +554,25 @@ export class Inbox extends EventEmitter<InboxEvents> {
 
   /**
    * Claude-Anwärter auf role unter rows: Claude-Chats, die die Rolle per Namen beanspruchen,
-   * und der Inhaber holderId, falls er ein Claude-Chat ist.
+   * und der Inhaber holderId, falls er ein Claude-Chat ist. Ein Chat, der schon die andere
+   * exklusive Rolle hält, zählt nicht: Er tauscht seine Rolle nie automatisch (#51). roleOf
+   * liefert die Rolle eines Chats, bei einem geplanten Wechsel die Rolle danach.
    */
-  private claudeClaimants(role: ExclusiveRole, rows: SessionRow[], holderId: string | null): SessionRow[] {
-    return rows.filter((r) => this.runningClaude(r) && (r.id === holderId || roleFromName(this.effectiveName(r)) === role));
+  private claudeClaimants(
+    role: ExclusiveRole,
+    rows: SessionRow[],
+    holderId: string | null,
+    roleOf: (r: SessionRow) => SessionRole | null = (r) => r.role,
+  ): SessionRow[] {
+    const holdsOther = (r: SessionRow): boolean => {
+      const own = roleOf(r);
+      return (own === "pm" || own === "director") && own !== role;
+    };
+    return rows.filter(
+      (r) =>
+        this.runningClaude(r) &&
+        (r.id === holderId || (roleFromName(this.effectiveName(r)) === role && !holdsOther(r))),
+    );
   }
 
   /**
@@ -581,7 +596,8 @@ export class Inbox extends EventEmitter<InboxEvents> {
       const claude = this.claudeClaimants(role, rows, holder?.id ?? null);
       if (claude.length !== 1) continue;
       const winner = claude[0]!;
-      if (winner.role === "pm" || winner.role === "director") continue;
+      // Inhaber ist er schon; die andere exklusive Rolle schließt claudeClaimants aus.
+      if (winner.role === role) continue;
       this.setRole(winner.id, role, CLAUDE_PRIORITY);
     }
   }
@@ -599,7 +615,8 @@ export class Inbox extends EventEmitter<InboxEvents> {
     if (exclusive(row.role) && row.role !== role) affected.push([row.role, null, (w) => w === row.id]);
     for (const [r, holderId, blocked] of affected) {
       const rows = this.liveInScope(r, row.project_id);
-      const claude = this.claudeClaimants(r, rows, holderId);
+      // Maßgeblich sind die Rollen nach dem Wechsel: row hat dann role.
+      const claude = this.claudeClaimants(r, rows, holderId, (o) => (o.id === row.id ? role : o.role));
       if (claude.length !== 1 || !blocked(claude[0]!.id)) continue;
       const others = rows.filter((o) => o.id !== claude[0]!.id && (o.id === holderId || roleFromName(this.effectiveName(o)) === r));
       if (others.length === 0) continue;
