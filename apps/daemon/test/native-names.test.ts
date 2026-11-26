@@ -80,7 +80,8 @@ test("Ein periodischer Namensabgleich lässt gesetzten Alias und neu vergebenen 
   const entry = { pid: process.pid, sessionId: "cli", cwd: "/scratch/ordner", name: "Director", nameSource: "user", startedAt: null };
   inbox.registrySync().upsert(entry);
   assert.equal(inbox.sessions().find(s => s.id === "cli")?.role, "director");
-  inbox.upsertSession({ id: "next", app: "codex", cwd: entry.cwd, role: "director" });
+  // Zwei Claude-Anwärter: der Claude-Vorrang (#48) greift nicht, die Übergabe bleibt.
+  inbox.upsertSession({ id: "next", app: "claude", cwd: entry.cwd, role: "director" });
   inbox.registrySync().upsert(entry);
   assert.equal(inbox.sessions().find(s => s.id === "next")?.role, "director");
   inbox.renameSession("cli", "Lokaler Alias");

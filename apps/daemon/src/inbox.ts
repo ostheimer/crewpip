@@ -20,6 +20,7 @@ import {
   type Target,
   APP_LABELS,
   ROLE_ADMIN_PROJECT,
+  ROLE_LABELS,
   roleFromName,
   formatTarget,
   parseTarget,
@@ -193,6 +194,9 @@ export function connectionOf(
   return activity && activity.pid === r.pid && turnWithoutHook(activity, now) ? "restart-needed" : "no-hook";
 }
 
+/** Akteur im Protokoll role_changes für automatische Wechsel durch den Claude-Vorrang (#48). */
+export const CLAUDE_PRIORITY = "automatisch: Claude-Vorrang";
+
 /** Dieselben dynamischen Ziele gelten für Posteingang und die lesende Chatansicht. */
 const SESSION_TARGETS = `(m.to_target = ? OR m.to_target IN (?, ?)
   OR (m.to_target IN (?, 'all') AND m.created_at >= ?)
@@ -258,12 +262,17 @@ export class Inbox extends EventEmitter<InboxEvents> {
     return this.db.prepare("SELECT * FROM sessions WHERE id = ?").get(id) as SessionRow | undefined;
   }
 
-  private toSession(r: SessionRow): Session {
+  private connectionState(r: SessionRow): ConnectionState {
     let connection = connectionOf(r, undefined, this.activityWithoutHook(r.id));
     if (!r.ended_at && this.antigravityArchives && r.app === "antigravity" && chainOf(r).some(p => p.comm === "Antigravity")) {
       const state = this.antigravityArchives.get(r.id) ?? "unconfirmed";
       if (state === "archived" || (state === "unconfirmed" && connection === "connected")) connection = state;
     }
+    return connection;
+  }
+
+  private toSession(r: SessionRow): Session {
+    const connection = this.connectionState(r);
     return {
       id: r.id,
       app: r.app,
@@ -377,6 +386,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
         this.endSession(r.id);
       }
     }
+    this.preferClaude();
     this.emit("sessions");
     return this.toSession(this.sessionRow(s.id)!);
   }
@@ -427,6 +437,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
     if (before && !before.ended_at && (before.role === "pm" || before.role === "director")) {
       for (const r of this.liveInScope(before.role, before.project_id)) this.claimFromName(r.id, true);
     }
+    this.preferClaude();
     this.emit("sessions");
   }
 
@@ -435,6 +446,7 @@ export class Inbox extends EventEmitter<InboxEvents> {
     if (!clean) throw new Error("Leerer Name");
     this.db.prepare("UPDATE sessions SET name = ?, name_source = 'override' WHERE id = ?").run(clean, id);
     this.claimFromName(id);
+    this.preferClaude();
     const row = this.sessionRow(id);
     if (!row) throw new Error("Unbekannte Session");
     this.board.emit("projects");
@@ -446,12 +458,16 @@ export class Inbox extends EventEmitter<InboxEvents> {
    * Rolle ausdrücklich setzen (Dashboard, set_role, mitgegebene Rolle). Es gibt je Projekt nur
    * einen PM und insgesamt nur einen Director; die Vergabe nimmt der bisherigen aktiven Session
    * die Rolle ab. Jede Änderung wird mit Akteur protokolliert (role_changes).
+   *
+   * Ausdrückliche Wechsel (Dashboard, set_role) an einem Claude-Anwärter vorbei lehnt der
+   * Claude-Vorrang ab (#48), sonst kippte preferClaude sie beim nächsten Abgleich zurück.
    */
   setRole(id: string, role: SessionRole | null, actor = "system"): Session {
     const row = this.sessionRow(id);
     if (!row) throw new Error(`Unbekannte Session: ${id}`);
     if (row.role === role) return this.toSession(row);
     if (row.ended_at && (role === "pm" || role === "director")) throw new Error(`Session ist beendet: ${row.name}`);
+    if (actor !== CLAUDE_PRIORITY && actor !== "system" && actor !== "name") this.checkClaudePriority(row, role);
     const log = this.db.prepare("INSERT INTO role_changes(role, project_id, from_session, to_session, actor) VALUES (?, ?, ?, ?, ?)");
     const scope = (r: SessionRole) => (r === "director" ? null : row.project_id);
     if (role === "director" || role === "pm") {
@@ -526,6 +542,73 @@ export class Inbox extends EventEmitter<InboxEvents> {
   syncNameRoles(): void {
     const ids = this.db.prepare("SELECT id FROM sessions WHERE ended_at IS NULL ORDER BY started_at").all() as unknown as { id: string }[];
     for (const { id } of ids) this.claimFromName(id);
+    this.preferClaude();
+  }
+
+  /** Laufender, nicht archivierter Claude-Chat: nur solche zählen für den Claude-Vorrang (#48). */
+  private runningClaude(r: SessionRow): boolean {
+    if (r.app !== "claude" || r.ended_at) return false;
+    const c = this.connectionState(r);
+    return c !== "stale" && c !== "archived";
+  }
+
+  /**
+   * Claude-Anwärter auf role unter rows: Claude-Chats, die die Rolle per Namen beanspruchen,
+   * und der Inhaber holderId, falls er ein Claude-Chat ist.
+   */
+  private claudeClaimants(role: ExclusiveRole, rows: SessionRow[], holderId: string | null): SessionRow[] {
+    return rows.filter((r) => this.runningClaude(r) && (r.id === holderId || roleFromName(this.effectiveName(r)) === role));
+  }
+
+  /**
+   * Claude-Vorrang (#48): Erheben mehrere lebende Chats Anspruch auf PM oder Director (Inhaber
+   * oder Namensanspruch) und ist genau einer davon ein laufender Claude-Chat, bekommt er die
+   * Rolle, auch wenn sie gerade ein anderer Chat hält. Bei zwei oder mehr Claude-Anwärtern
+   * bleibt alles, wie es ist; den Konflikt zeigt roleConflictOf. Ein Chat, der schon PM oder
+   * Director ist, tauscht seine Rolle nicht automatisch.
+   */
+  private preferClaude(): void {
+    const projects = this.db
+      .prepare("SELECT DISTINCT project_id FROM sessions WHERE ended_at IS NULL")
+      .all() as unknown as { project_id: string | null }[];
+    const scopes: [ExclusiveRole, string | null][] = [["director", null], ...projects.map((p): [ExclusiveRole, string | null] => ["pm", p.project_id])];
+    for (const [role, projectId] of scopes) {
+      // Jeder Bereich frisch lesen: ein früherer Wechsel kann Rollen verschoben haben.
+      const rows = this.liveInScope(role, projectId);
+      const holder = rows.find((r) => r.role === role) ?? null;
+      const claimants = rows.filter((r) => r.role === role || roleFromName(this.effectiveName(r)) === role);
+      if (claimants.length < 2) continue;
+      const claude = this.claudeClaimants(role, rows, holder?.id ?? null);
+      if (claude.length !== 1) continue;
+      const winner = claude[0]!;
+      if (winner.role === "pm" || winner.role === "director") continue;
+      this.setRole(winner.id, role, CLAUDE_PRIORITY);
+    }
+  }
+
+  /**
+   * Wirft, wenn der ausdrückliche Wechsel von row auf role preferClaude widerspräche: Er gibt
+   * die Rolle einem anderen Chat als dem einzigen Claude-Anwärter, oder dieser gibt sie ab,
+   * obwohl ein weiterer Chat sie beansprucht.
+   */
+  private checkClaudePriority(row: SessionRow, role: SessionRole | null): void {
+    const exclusive = (r: SessionRole | null): r is ExclusiveRole => r === "pm" || r === "director";
+    // [Rolle, Inhaber nach dem Wechsel, Wechsel unzulässig, wenn der Claude-Anwärter ... ist]
+    const affected: [ExclusiveRole, string | null, (winner: string) => boolean][] = [];
+    if (exclusive(role)) affected.push([role, row.id, (w) => w !== row.id]);
+    if (exclusive(row.role) && row.role !== role) affected.push([row.role, null, (w) => w === row.id]);
+    for (const [r, holderId, blocked] of affected) {
+      const rows = this.liveInScope(r, row.project_id);
+      const claude = this.claudeClaimants(r, rows, holderId);
+      if (claude.length !== 1 || !blocked(claude[0]!.id)) continue;
+      const others = rows.filter((o) => o.id !== claude[0]!.id && (o.id === holderId || roleFromName(this.effectiveName(o)) === r));
+      if (others.length === 0) continue;
+      const label = this.board.sessionDisplay(claude[0]!).label;
+      throw new Error(
+        `Claude-Vorrang: ${label} beansprucht die Rolle ${ROLE_LABELS[r]} per Namen und bekommt sie automatisch (#48). ` +
+          `Für einen anderen Inhaber zuerst diesen Claude-Chat umbenennen.`,
+      );
+    }
   }
 
   /** Beansprucht diese Session per Namen eine Rolle, die sie nicht hat? Siehe RoleConflict. */

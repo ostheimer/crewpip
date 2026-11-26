@@ -251,7 +251,13 @@ export function createMcpServer(
         );
       }
       const before = inbox.sessions().find((s) => s.id !== target.id && next && (next === "pm" || next === "director") && s.role === next && (next === "director" || s.projectId === target.projectId));
-      const after = inbox.setRole(target.id, next, `session:${self.id}`);
+      let after;
+      try {
+        after = inbox.setRole(target.id, next, `session:${self.id}`);
+      } catch (e) {
+        // Zum Beispiel der Claude-Vorrang (#48): die Meldung erklärt, was zu tun ist.
+        return fail((e as Error).message);
+      }
       const address = next === "pm" ? `pm:${after.projectId}` : next === "director" ? "director" : null;
       const text =
         `${after.label}: Rolle ${next ? ROLE_LABELS[next] : "keine"}` +
