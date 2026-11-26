@@ -54,7 +54,7 @@ test("Director-Post erreicht beim Abgleich nativer Titel nur den eigentlichen Di
   assert.equal(role(inbox, "auftrag"), null);
 });
 
-test("Bestehende Director-Zuweisungen bleiben bis zur ausdrücklichen Übergabe gültig", () => {
+test("Bestehende Director-Zuweisung an einen Nicht-Claude-Chat weicht beim Start dem Claude-Vorrang (#48)", () => {
   for (const actor of ["name", "dashboard"]) {
     const { inbox, board, db } = setup();
     inbox.upsertSession({ id: "inhaber", app: "codex", cwd: "/p/a", name: "Director-Auftrag" });
@@ -62,9 +62,9 @@ test("Bestehende Director-Zuweisungen bleiben bis zur ausdrücklichen Übergabe 
     const restarted = new Inbox(db, board);
     restarted.upsertSession({ id: "leitung", app: "claude", cwd: "/p/b", name: "Director" });
     restarted.syncNameRoles();
-    assert.equal(role(restarted, "inhaber"), "director");
-    assert.equal(role(restarted, "leitung"), null);
-    restarted.setRole("leitung", "director", "dashboard");
+    assert.equal(role(restarted, "inhaber"), null);
+    assert.equal(role(restarted, "leitung"), "director");
+    assert.equal(restarted.roleChanges().find((c) => c.toSession === "leitung")?.actor, "automatisch: Claude-Vorrang");
     restarted.endSession("leitung");
     assert.equal(role(restarted, "inhaber"), null);
     db.close();
@@ -137,11 +137,12 @@ test("#28/2 Zweiter Namensanspruch hängt nicht still um: Inhaber behält, Konfl
   assert.equal(role(inbox, "cl"), "pm");
 });
 
-test("#28/2 Beanspruchen zwei Chats gleichzeitig eine freie Rolle, bekommt sie keiner still", () => {
+test("#28/2 Beanspruchen zwei Nicht-Claude-Chats gleichzeitig eine freie Rolle, bekommt sie keiner still", () => {
   const { inbox, titles } = setup();
-  inbox.upsertSession({ id: "cl", app: "claude", cwd: "/p/chatreact" });
+  // Mit einem Claude-Chat darunter gilt der Claude-Vorrang (#48), siehe claude-priority.test.ts.
+  inbox.upsertSession({ id: "cl", app: "codex", cwd: "/p/chatreact" });
   inbox.upsertSession({ id: "cx", app: "codex", cwd: "/p/chatreact" });
-  titles.set("claude:cl", "PM chatreact");
+  titles.set("codex:cl", "PM chatreact");
   titles.set("codex:cx", "PM chatreact");
   inbox.syncNameRoles?.();
   assert.equal(role(inbox, "cl"), null);
@@ -158,17 +159,18 @@ test("#28/2 Beanspruchen zwei Chats gleichzeitig eine freie Rolle, bekommt sie k
   assert.equal(inbox.sessions().find((s) => s.id === "cx")!.roleConflict?.holderId, "cl");
 });
 
-test("#28/2 Bestehende Rollen bleiben beim Start unverändert", () => {
+test("#28/2 Bestehende Rollen bleiben beim Start gegenüber Nicht-Claude-Anwärtern unverändert", () => {
   const { db, board } = setup();
   const first = new Inbox(db, board);
   first.upsertSession({ id: "codexpm", app: "codex", cwd: "/p/firma" });
   first.setRole("codexpm", "pm", "Test");
-  // Neuer Daemon-Start: Ein Claude-Chat mit PM-Namen meldet sich zuerst
+  // Neuer Daemon-Start: Ein Antigravity-Chat mit PM-Namen meldet sich zuerst.
+  // Ein Claude-Chat bekäme die Rolle (#48), siehe claude-priority.test.ts.
   const second = new Inbox(db, board);
-  second.registrySync().upsert({ pid: process.pid, sessionId: "claudepm", cwd: "/p/firma", name: "PM firma", nameSource: "user", startedAt: null });
+  second.upsertSession({ id: "agpm", app: "antigravity", cwd: "/p/firma", name: "PM firma" });
   second.syncNameRoles?.();
   assert.equal(role(second, "codexpm"), "pm");
-  assert.equal(role(second, "claudepm"), null);
+  assert.equal(role(second, "agpm"), null);
 });
 
 test("#28/2 Review: Inhaber verliert PM nicht durch Umbenennen, beendete Chats bekommen keine exklusive Rolle", () => {
@@ -205,11 +207,11 @@ test("#28/3+4 set_role: nur Inhaber, Director oder PM crewpip; protokolliert; wa
   const { db, board, inbox, titles } = setup();
   const d = await daemonWith(inbox, board, db);
   t.after(d.close);
-  // claribill: Codex hält die Rolle, Claude beansprucht sie per Namen
+  // claribill: Codex hält die Rolle, der Claude-Chat beansprucht sie noch nicht per Namen
+  // (sonst bekäme er sie automatisch, #48).
   inbox.upsertSession({ id: "cx-pm", app: "codex", cwd: "/p/claribill" });
   inbox.setRole("cx-pm", "pm", "Test");
   inbox.upsertSession({ id: "cl-pm", app: "claude", cwd: "/p/claribill/.claude/worktrees/pm" });
-  titles.set("claude:cl-pm", "PM claribill");
   inbox.upsertSession({ id: "fremd", app: "antigravity", cwd: "/p/anderes", name: "Worker anderes" });
   inbox.upsertSession({ id: "dir", app: "cursor", cwd: "/p/zentrale", name: "Director" });
   inbox.upsertSession({ id: "pm-crewpip", app: "claude", cwd: "/p/crewpip", name: "PM crewpip" });
@@ -232,6 +234,7 @@ test("#28/3+4 set_role: nur Inhaber, Director oder PM crewpip; protokolliert; wa
   assert.equal(ok.isError, false, ok.text);
   assert.equal(role(inbox, "cl-pm"), "pm");
   assert.equal(role(inbox, "cx-pm"), null);
+  titles.set("claude:cl-pm", "PM claribill");
 
   // Director und PM crewpip dürfen überall
   assert.equal((await d.call("cursor", "/p/zentrale", "set_role", { session: "leer", role: "pm" })).isError, false);
@@ -255,6 +258,11 @@ test("#28/3+4 set_role: nur Inhaber, Director oder PM crewpip; protokolliert; wa
   inbox.upsertSession({ id: "cx-2", app: "codex", cwd: "/p/claribill/.claude/worktrees/x" });
   titles.set("codex:cx-2", "PM claribill");
   inbox.syncNameRoles?.();
+  // Am Claude-Anwärter vorbei lehnt set_role mit Begründung ab (#48).
+  const blocked = await d.call("cursor", "/p/zentrale", "set_role", { session: "cx-2", role: "pm" });
+  assert.equal(blocked.isError, true);
+  assert.match(blocked.text, /Claude-Vorrang/);
+  assert.equal(role(inbox, "cl-pm"), "pm");
   const listed = await d.call("antigravity", "/p/anderes", "list_sessions", {});
   assert.match(listed.text, /Konflikt/);
   assert.match(listed.text, /PM claribill.*\[PM\]/);
@@ -266,7 +274,13 @@ test("#28/3 Dashboard: Rollenwechsel über die API wird mit Akteur protokolliert
   t.after(d.close);
   inbox.upsertSession({ id: "a", app: "claude", cwd: "/p/x", name: "PM x" });
   inbox.upsertSession({ id: "b", app: "codex", cwd: "/p/x" });
-  const res = await fetch(`${d.base}/api/sessions/b`, { method: "PATCH", headers: { "content-type": "application/json", "x-crewpip-token": TOKEN }, body: JSON.stringify({ role: "pm" }) });
+  const patch = () => fetch(`${d.base}/api/sessions/b`, { method: "PATCH", headers: { "content-type": "application/json", "x-crewpip-token": TOKEN }, body: JSON.stringify({ role: "pm" }) });
+  // Claude-Vorrang (#48): solange a die Rolle per Namen beansprucht, lehnt die API ab.
+  const denied = await patch();
+  assert.equal(denied.status, 400);
+  assert.match(((await denied.json()) as { error: string }).error, /Claude-Vorrang/);
+  inbox.renameSession("a", "Planung x");
+  const res = await patch();
   assert.equal(res.status, 200);
   assert.equal(role(inbox, "b"), "pm");
   assert.equal(role(inbox, "a"), null);

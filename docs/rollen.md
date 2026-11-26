@@ -23,12 +23,24 @@ Gewöhnliche Aufgabentitel wie „PM-Rolle prüfen“ oder „Director-Anweisung
 beanspruchen keine Rolle; sie kommt dann nur per `set_role` oder Dashboard. Groß- und
 Kleinschreibung sowie Leerzeichen am Anfang und Ende spielen dabei keine Rolle.
 
-**Konflikte werden nicht still aufgelöst.** Heißt ein zweiter laufender Chat wie der PM oder
-Director, behält der bisherige Inhaber die Rolle. Die Übersicht zeigt in der Projektzeile
-„Rollenkonflikt“, `list_sessions` nennt ihn unter dem betroffenen Chat. Beanspruchen zwei Chats
-eine freie Rolle gleichzeitig, bekommt sie keiner, bis jemand entscheidet. Bestehende Rollen
-ändert CrewPip von sich aus nicht; endet der Inhaber, bekommt sie ein Chat, der sie als einziger
-per Namen beansprucht.
+**Claude-Vorrang.** Beanspruchen mehrere laufende Chats dieselbe Rolle (`pm:<projekt>` oder
+`director`) und ist genau einer davon ein Claude-Chat, bekommt dieser die Rolle automatisch,
+auch wenn sie gerade ein Codex- oder Antigravity-Chat hält (Entscheidung Andreas vom 24.11.
+und 26.11.2026, #28 und #48). Anwärter ist, wer die Rolle hält oder sie per Namen beansprucht.
+Als Claude-Anwärter zählen nur laufende Claude-Chats, nicht beendete, archivierte oder
+solche mit totem Prozess. Ein Chat, der schon PM oder
+Director ist, tauscht seine Rolle nicht automatisch. Jeder solche Wechsel steht in
+`role_changes` mit dem Akteur `automatisch: Claude-Vorrang`. Der Vorrang gilt immer, damit ein
+Neustart die Rolle nicht wieder an einen anderen Chat gibt: `set_role` und Dashboard lehnen
+einen Wechsel ab, der ihm widerspricht, und nennen den Claude-Chat. Soll ein anderer Chat die
+Rolle bekommen, wird zuerst der Claude-Chat umbenannt.
+
+**Sonst werden Konflikte nicht still aufgelöst.** Heißt ein zweiter laufender Chat wie der PM
+oder Director, behält der bisherige Inhaber die Rolle. Das gilt auch bei zwei oder mehr
+Claude-Anwärtern. Die Übersicht zeigt in der Projektzeile „Rollenkonflikt“, `list_sessions`
+nennt ihn unter dem betroffenen Chat. Beanspruchen zwei Chats ohne Claude-Vorrang eine freie
+Rolle gleichzeitig, bekommt sie keiner, bis jemand entscheidet. Endet der Inhaber, bekommt die
+Rolle ein Chat, der sie als einziger per Namen beansprucht.
 
 **Umhängen** – nur mit Entscheidung des Menschen, die im Issue vermerkt ist:
 
@@ -39,7 +51,8 @@ per Namen beansprucht.
 - Der bisherige Inhaber verliert die Rolle. Post, die an `pm:<projekt>` oder `director` wartet,
   bekommt der neue Inhaber bei seinem nächsten Turn.
 - Jeder Wechsel wird protokolliert (Tabelle `role_changes`, lesbar über `GET /api/role-changes`):
-  wer (`session:<id>`, `dashboard` oder `name` für die Ableitung aus dem Namen), wann, von wem zu wem.
+  wer (`session:<id>`, `dashboard`, `name` für die Ableitung aus dem Namen oder
+  `automatisch: Claude-Vorrang`), wann, von wem zu wem.
 
 Ein dauerhafter Konflikt lässt sich auch lösen, indem der überzählige Chat umbenannt wird.
 
