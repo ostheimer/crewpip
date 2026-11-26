@@ -19,7 +19,7 @@ or organisation.
 CrewPip derives the role from the effective display name (“PM …”, “Director”, “Worker …”),
 wherever the name comes from: `/rename` in Claude Code, the title in Codex or Claude Desktop,
 or the name sent by the hook (Antigravity). It is evaluated at registration and on every rename.
-For the director role, the full title must be `Director`. The match ignores case and surrounding
+For the director role, the full title must be `Director`; for the PM it must be `PM <project>` (one word, optionally followed by a parenthetical such as `PM CMM (Mac Studio)`). Ordinary task titles such as “PM role check” or “Director instructions” claim no role; those get one only via `set_role` or the dashboard. The match ignores case and surrounding
 whitespace.
 
 **Conflicts are never resolved silently.** If a second running chat is named like the PM or

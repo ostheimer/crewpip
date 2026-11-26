@@ -28,7 +28,15 @@ test("Nur der vollständige Titel Director beansprucht die Director-Rolle", () =
   assert.equal(roleFromName("Director kontaktieren"), null);
   assert.equal(roleFromName("Director: Planung"), null);
   assert.equal(roleFromName("PM Werkstatt"), "pm");
+  assert.equal(roleFromName("  pm CMM (Mac Studio) "), "pm");
+  assert.equal(roleFromName("PM crewpip(#45)"), "pm");
   assert.equal(roleFromName("Worker Werkstatt"), "worker");
+});
+
+test("Gewöhnliche Aufgabentitel mit PM am Anfang beanspruchen keine PM-Rolle (#45)", () => {
+  for (const t of ["PM-Rolle prüfen", "PM an Merge erinnern", "PM: Übergabe", "PM", "PM Werkstatt übernehmen", "PM Werkstatt (offen) Rest", "PMs sammeln", "PM (Mac)"]) {
+    assert.equal(roleFromName(t), null, t);
+  }
 });
 
 test("Director-Post erreicht beim Abgleich nativer Titel nur den eigentlichen Director", () => {

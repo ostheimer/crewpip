@@ -43,12 +43,15 @@ export const ROLE_LABELS: Record<SessionRole, string> = {
 
 /**
  * Rolle aus dem Sitzungsnamen ableiten, damit die eingespielte Namenskonvention
- * ("Director", "PM outbig", "Worker CrewPip") ohne Zusatzaufwand weiter funktioniert.
+ * ("Director", "PM outbig", "PM CMM (Mac Studio)", "Worker CrewPip") ohne Zusatzaufwand
+ * weiter funktioniert. Director und PM gelten nur für genau diese Bezeichnungen (#45).
  */
 export function roleFromName(name: string): SessionRole | null {
   const n = name.trim();
   if (/^director$/i.test(n)) return "director";
-  if (/^pm\b/i.test(n)) return "pm";
+  // Nur "PM <projekt>" (ein Wort), optional mit Zusatz in Klammern; Aufgabentitel wie
+  // "PM-Rolle prüfen" oder "PM an Merge erinnern" beanspruchen nichts (#45).
+  if (/^pm\s+[^\s()]+(?:\s*\([^()]*\))?$/i.test(n)) return "pm";
   if (/^worker\b/i.test(n)) return "worker";
   return null;
 }

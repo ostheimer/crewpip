@@ -371,7 +371,7 @@ pnpm typecheck && pnpm test
 alle Projekte, ein **PM** je Repository, **Worker** für die Umsetzung. CrewPip kennt diese
 Rollen als Feld an der Session.
 
-- Die Rolle ergibt sich aus dem wirksamen Anzeigenamen: `Director`, `PM <repo>`, `Worker <repo>`,
+- Die Rolle ergibt sich aus dem wirksamen Anzeigenamen: `Director`, `PM <repo>` (optional mit Zusatz in Klammern), `Worker <repo>`,
   gleich ob er per `/rename`, als nativer Titel in Codex oder Claude Desktop oder vom Hook kommt.
   Wer die Namenskonvention einhält, muss nichts weiter tun.
 - Es gibt höchstens einen Director und höchstens einen PM je Projekt. Ein Name hängt nie still
